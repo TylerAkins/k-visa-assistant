@@ -7,14 +7,27 @@ export type PublicHealthResponseBody = {
   status: "ok" | "degraded";
 };
 
+export type RateLimitedHealthResponseBody = {
+  status: "degraded";
+  reason: "rate_limited";
+};
+
 export type HealthResponseBody =
   | LocalHealthResponseBody
-  | PublicHealthResponseBody;
+  | PublicHealthResponseBody
+  | RateLimitedHealthResponseBody;
 
 export type HealthResponse = {
   status: number;
   body: HealthResponseBody;
 };
+
+export function buildRateLimitedHealthResponse(): HealthResponse {
+  return {
+    status: 429,
+    body: { status: "degraded", reason: "rate_limited" },
+  };
+}
 
 export function buildHealthResponse(
   isConnected: boolean,

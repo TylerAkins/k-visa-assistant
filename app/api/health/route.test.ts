@@ -62,6 +62,16 @@ describe("GET /api/health", () => {
     expect(body).not.toHaveProperty("database");
   });
 
+  it("returns degraded with database details when disconnected in local", async () => {
+    checkDatabaseConnectionMock.mockResolvedValue(false);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({ status: "degraded", database: "disconnected" });
+  });
+
   it("hides database details in deployed environments", async () => {
     envMock.APP_ENV = "prod";
     checkDatabaseConnectionMock.mockResolvedValue(true);
@@ -106,7 +116,7 @@ describe("GET /api/health", () => {
     const body = await response.json();
 
     expect(response.status).toBe(429);
-    expect(body).toEqual({ status: "degraded" });
+    expect(body).toEqual({ status: "degraded", reason: "rate_limited" });
     expect(response.headers.get("Retry-After")).toBe("30");
     expect(checkDatabaseConnectionMock).not.toHaveBeenCalled();
   });

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   checkRateLimit,
+  getRateLimitBucketCountForTests,
   resetRateLimitsForTests,
 } from "@/lib/security/rate-limit";
 
@@ -36,5 +37,25 @@ describe("checkRateLimit", () => {
     expect(checkRateLimit("health:1.2.3.4", 2, 60_000, 61_000)).toEqual({
       allowed: true,
     });
+  });
+
+  it("purges expired buckets before evaluating a request", () => {
+    expect(checkRateLimit("health:old", 1, 1_000, 0)).toEqual({
+      allowed: true,
+    });
+    expect(getRateLimitBucketCountForTests()).toBe(1);
+
+    expect(checkRateLimit("health:new", 1, 1_000, 2_000)).toEqual({
+      allowed: true,
+    });
+    expect(getRateLimitBucketCountForTests()).toBe(1);
+  });
+
+  it("caps the number of tracked buckets", () => {
+    for (let index = 0; index < 10_001; index += 1) {
+      checkRateLimit(`health:${index}`, 100, 60_000, 1_000);
+    }
+
+    expect(getRateLimitBucketCountForTests()).toBe(10_000);
   });
 });

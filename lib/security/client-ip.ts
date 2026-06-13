@@ -2,7 +2,17 @@ import "server-only";
 
 import { headers } from "next/headers";
 
-export async function getRequestClientIp(): Promise<string> {
+type GetRequestClientIpOptions = {
+  trustProxy: boolean;
+};
+
+export async function getRequestClientIp(
+  options: GetRequestClientIpOptions,
+): Promise<string> {
+  if (!options.trustProxy) {
+    return "local";
+  }
+
   const headerStore = await headers();
   const forwardedFor = headerStore.get("x-forwarded-for");
 

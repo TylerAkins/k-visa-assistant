@@ -2,6 +2,15 @@ import { z } from "zod";
 
 import { isValidCidrList } from "@/lib/security/cidr";
 
+function isPostgresDatabaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "postgresql:" || url.protocol === "postgres:";
+  } catch {
+    return false;
+  }
+}
+
 export const appEnvironments = ["local", "dev", "prod"] as const;
 export type AppEnvironment = (typeof appEnvironments)[number];
 
@@ -10,7 +19,12 @@ export const envSchema = z
     APP_ENV: z.enum(appEnvironments),
     NODE_ENV: z.enum(["development", "test", "production"]),
     APP_URL: z.url(),
-    DATABASE_URL: z.string().min(1),
+    DATABASE_URL: z
+      .string()
+      .min(1)
+      .refine(isPostgresDatabaseUrl, {
+        message: "DATABASE_URL must be a postgresql:// or postgres:// URL",
+      }),
     DEV_ALLOWED_CIDRS: z.string().optional(),
   })
   .superRefine((data, context) => {

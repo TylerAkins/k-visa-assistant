@@ -5,9 +5,34 @@ type RateLimitBucket = {
 
 const buckets = new Map<string, RateLimitBucket>();
 
+const MAX_BUCKETS = 10_000;
+
 export type RateLimitResult =
   | { allowed: true }
   | { allowed: false; retryAfterSeconds: number };
+
+function purgeExpiredBuckets(now: number, windowMs: number): void {
+  for (const [key, bucket] of buckets) {
+    if (now - bucket.windowStart >= windowMs) {
+      buckets.delete(key);
+    }
+  }
+}
+
+function enforceMaxBuckets(): void {
+  if (buckets.size <= MAX_BUCKETS) {
+    return;
+  }
+
+  const entries = [...buckets.entries()].sort(
+    (left, right) => left[1].windowStart - right[1].windowStart,
+  );
+  const overflow = buckets.size - MAX_BUCKETS;
+
+  for (const [key] of entries.slice(0, overflow)) {
+    buckets.delete(key);
+  }
+}
 
 export function checkRateLimit(
   key: string,
@@ -15,10 +40,13 @@ export function checkRateLimit(
   windowMs: number,
   now = Date.now(),
 ): RateLimitResult {
+  purgeExpiredBuckets(now, windowMs);
+
   const bucket = buckets.get(key);
 
   if (!bucket || now - bucket.windowStart >= windowMs) {
     buckets.set(key, { count: 1, windowStart: now });
+    enforceMaxBuckets();
     return { allowed: true };
   }
 
@@ -36,4 +64,8 @@ export function checkRateLimit(
 
 export function resetRateLimitsForTests(): void {
   buckets.clear();
+}
+
+export function getRateLimitBucketCountForTests(): number {
+  return buckets.size;
 }

@@ -82,6 +82,24 @@ describe("envSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("rejects non-postgres DATABASE_URL values", () => {
+    const result = envSchema.safeParse({
+      ...localConfig,
+      DATABASE_URL: "mysql://user:pass@127.0.0.1:3306/kvisaassistant",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects malformed DATABASE_URL values", () => {
+    const result = envSchema.safeParse({
+      ...localConfig,
+      DATABASE_URL: "not-a-database-url",
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("formatEnvErrors", () => {

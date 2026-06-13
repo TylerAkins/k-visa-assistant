@@ -35,8 +35,37 @@ Add `--force` to overwrite an existing `.env`.
 - `APP_ENV` must be `local`, `dev`, or `prod`
 - `dev` and `prod` require `NODE_ENV=production`
 - `DEV_ALLOWED_CIDRS` is only valid when `APP_ENV=dev`
+- `DEV_ALLOWED_CIDRS` entries must be canonical IPv4 CIDR blocks (host bits zeroed)
 
 Validation errors list field names only, never secret values.
+
+- `DATABASE_URL` must be a `postgresql://` or `postgres://` URL
+
+## Build and CI
+
+Server modules (`lib/env.ts`, `lib/db/index.ts`) validate environment variables when they are imported. `next build` therefore needs the same required variables as runtime, even for pages that prerender statically.
+
+| Build target | Recommended `APP_ENV` | Notes |
+|--------------|----------------------|-------|
+| Local dev machine | `local` | Uses Docker Postgres on `127.0.0.1` |
+| Staging / production | `dev` or `prod` | Set `NODE_ENV=production` and real `DATABASE_URL` / `APP_URL` in CI or the deploy host |
+
+Do not build deployed artifacts with `APP_ENV=local`. That target is for developer machines only and enables local-only diagnostics on the homepage and health API.
+
+Example CI build:
+
+```bash
+APP_ENV=prod NODE_ENV=production \
+  APP_URL=https://app.example.com \
+  DATABASE_URL=postgresql://user:pass@db.example.com:5432/kvisaassistant \
+  pnpm build
+```
+
+## Client IP and rate limiting
+
+On `dev` and `prod`, the app trusts `X-Forwarded-For` / `X-Real-IP` set by the reverse proxy (Caddy in Phase 9). On `local`, those headers are ignored so clients cannot spoof IPs during development; all requests share a single rate-limit bucket.
+
+Rate limiting is in-memory per process. It is suitable for a single VPS; use a shared store if you scale horizontally.
 
 ## Dev IP restriction
 

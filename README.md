@@ -46,9 +46,11 @@ Use `pnpm setup -- --env dev` or `pnpm setup -- --env prod` for deployment templ
 
 `APP_ENV` (`local` \| `dev` \| `prod`) is validated at startup and is separate from `NODE_ENV`.
 
+Deployed builds (`dev` / `prod`) require valid env vars at build time because server modules validate on import. See [docs/environments.md](docs/environments.md#build-and-ci).
+
 ## Security
 
-- Never commit `.env` files. Only `.env.example` is tracked.
+- Never commit `.env` files. Templates (`.env.example`, `.env.dev.example`, `.env.prod.example`) are tracked.
 - Local `.env` is created with `600` permissions via `pnpm setup`.
 - Production secrets must be rotated and stored in environment variables only.
 - Social Security Numbers are never stored in the database or on disk. See [docs/phase-0-foundation.md](docs/phase-0-foundation.md).

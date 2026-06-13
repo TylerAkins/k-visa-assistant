@@ -8,6 +8,16 @@ describe("isValidIpv4Cidr", () => {
     expect(isValidIpv4Cidr("198.51.100.42/32")).toBe(true);
   });
 
+  it("rejects host bits outside the network prefix", () => {
+    expect(isValidIpv4Cidr("10.0.0.1/24")).toBe(false);
+    expect(isValidIpv4Cidr("192.168.1.255/24")).toBe(false);
+  });
+
+  it("accepts only canonical /0 networks", () => {
+    expect(isValidIpv4Cidr("0.0.0.0/0")).toBe(true);
+    expect(isValidIpv4Cidr("0.0.0.1/0")).toBe(false);
+  });
+
   it("rejects invalid prefixes and octets", () => {
     expect(isValidIpv4Cidr("256.0.0.0/24")).toBe(false);
     expect(isValidIpv4Cidr("10.0.0.0/33")).toBe(false);

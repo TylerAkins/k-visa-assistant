@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildHealthResponse } from "@/lib/health/response";
+import { buildHealthResponse, buildRateLimitedHealthResponse } from "@/lib/health/response";
 
 describe("buildHealthResponse", () => {
   describe("local (exposeDatabase)", () => {
@@ -32,6 +32,15 @@ describe("buildHealthResponse", () => {
         status: 503,
         body: { status: "degraded" },
       });
+    });
+  });
+});
+
+describe("buildRateLimitedHealthResponse", () => {
+  it("returns a distinct rate-limited payload", () => {
+    expect(buildRateLimitedHealthResponse()).toEqual({
+      status: 429,
+      body: { status: "degraded", reason: "rate_limited" },
     });
   });
 });
