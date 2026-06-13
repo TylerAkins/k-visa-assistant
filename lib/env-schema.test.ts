@@ -64,6 +64,18 @@ describe("envSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects DEV_ALLOWED_CIDRS that allow every IPv4 address", () => {
+    const result = envSchema.safeParse({
+      APP_ENV: "dev",
+      NODE_ENV: "production",
+      APP_URL: "https://dev.example.com",
+      DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+      DEV_ALLOWED_CIDRS: "0.0.0.0/0",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("accepts a valid prod configuration", () => {
     const result = envSchema.safeParse({
       APP_ENV: "prod",

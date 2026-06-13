@@ -9,10 +9,6 @@ function isCanonicalNetworkAddress(
 ): boolean {
   const ip = ipv4ToInt(octets);
 
-  if (prefix === 0) {
-    return ip === 0;
-  }
-
   const mask =
     prefix === 32 ? 0xffff_ffff : ((0xffff_ffff << (32 - prefix)) >>> 0);
   const network = (ip & mask) >>> 0;
@@ -37,7 +33,7 @@ export function isValidIpv4Cidr(value: string): boolean {
   ];
   const prefix = Number(match[5]);
 
-  if (prefix > 32) {
+  if (prefix < 1 || prefix > 32) {
     return false;
   }
 

@@ -54,6 +54,35 @@ describe("getRequestClientIp", () => {
     );
   });
 
+  it("ignores malformed and oversized trusted proxy values", async () => {
+    headersMock.mockResolvedValue({
+      get: (name: string) => {
+        if (name === "x-forwarded-for") {
+          return "not-an-ip";
+        }
+        if (name === "x-real-ip") {
+          return "1".repeat(46);
+        }
+        return null;
+      },
+    });
+
+    await expect(getRequestClientIp({ trustProxy: true })).resolves.toBe(
+      "unknown",
+    );
+  });
+
+  it("accepts IPv6 trusted proxy values", async () => {
+    headersMock.mockResolvedValue({
+      get: (name: string) =>
+        name === "x-forwarded-for" ? "2001:db8::1" : null,
+    });
+
+    await expect(getRequestClientIp({ trustProxy: true })).resolves.toBe(
+      "2001:db8::1",
+    );
+  });
+
   it("falls back to x-real-ip and then unknown", async () => {
     headersMock.mockResolvedValue({
       get: (name: string) => (name === "x-real-ip" ? "198.51.100.42" : null),

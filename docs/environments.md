@@ -36,6 +36,7 @@ Add `--force` to overwrite an existing `.env`.
 - `dev` and `prod` require `NODE_ENV=production`
 - `DEV_ALLOWED_CIDRS` is only valid when `APP_ENV=dev`
 - `DEV_ALLOWED_CIDRS` entries must be canonical IPv4 CIDR blocks (host bits zeroed)
+- `DEV_ALLOWED_CIDRS` cannot include `/0` networks
 
 Validation errors list field names only, never secret values.
 
@@ -63,9 +64,11 @@ APP_ENV=prod NODE_ENV=production \
 
 ## Client IP and rate limiting
 
-On `dev` and `prod`, the app trusts `X-Forwarded-For` / `X-Real-IP` set by the reverse proxy (Caddy in Phase 9). On `local`, those headers are ignored so clients cannot spoof IPs during development; all requests share a single rate-limit bucket.
+`/api/health` is rate limited only when `APP_ENV=local`. Deployed `dev` and `prod` health checks are not app-rate-limited in Phase 0 so uptime monitors cannot be blocked by a single caller. Abuse protection for public deployments moves to the reverse proxy in Phase 9.
 
-Rate limiting is in-memory per process. It is suitable for a single VPS; use a shared store if you scale horizontally.
+Rate limiting is in-memory per process. It is suitable for a single VPS; use a shared store if you scale horizontally or need per-user limits on authenticated routes.
+
+Future routes that need per-client limits may use `getRequestClientIp({ trustProxy: true })` only behind a reverse proxy that strips incoming `X-Forwarded-For` / `X-Real-IP` and rewrites them from the real connection source.
 
 ## Dev IP restriction
 

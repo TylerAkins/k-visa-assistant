@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { checkDatabaseConnectionMock, envMock, checkRateLimitMock, getRequestClientIpMock } =
+const { checkDatabaseConnectionMock, envMock, checkRateLimitMock } =
   vi.hoisted(() => ({
     checkDatabaseConnectionMock: vi.fn(),
     envMock: { APP_ENV: "local" as "local" | "dev" | "prod" },
     checkRateLimitMock: vi.fn().mockReturnValue({ allowed: true }),
-    getRequestClientIpMock: vi.fn().mockResolvedValue("203.0.113.1"),
   }));
 
 vi.mock("server-only", () => ({}));
@@ -22,10 +21,6 @@ vi.mock("@/lib/env", () => ({
   env: envMock,
 }));
 
-vi.mock("@/lib/security/client-ip", () => ({
-  getRequestClientIp: getRequestClientIpMock,
-}));
-
 vi.mock("@/lib/security/rate-limit", () => ({
   checkRateLimit: checkRateLimitMock,
 }));
@@ -37,7 +32,6 @@ describe("GET /api/health", () => {
     vi.clearAllMocks();
     envMock.APP_ENV = "local";
     checkRateLimitMock.mockReturnValue({ allowed: true });
-    getRequestClientIpMock.mockResolvedValue("203.0.113.1");
   });
 
   it("exposes database status only in local", async () => {
@@ -48,6 +42,11 @@ describe("GET /api/health", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ status: "ok", database: "connected" });
+    expect(checkRateLimitMock).toHaveBeenCalledWith(
+      "health:local",
+      60,
+      60_000,
+    );
   });
 
   it("hides database details in dev", async () => {
@@ -60,6 +59,7 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ status: "ok" });
     expect(body).not.toHaveProperty("database");
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
   });
 
   it("returns degraded with database details when disconnected in local", async () => {
@@ -82,6 +82,7 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ status: "ok" });
     expect(body).not.toHaveProperty("database");
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
   });
 
   it("returns degraded without database details when disconnected in prod", async () => {
@@ -93,6 +94,7 @@ describe("GET /api/health", () => {
 
     expect(response.status).toBe(503);
     expect(body).toEqual({ status: "degraded" });
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
   });
 
   it("returns degraded when the health check throws", async () => {
@@ -104,9 +106,10 @@ describe("GET /api/health", () => {
 
     expect(response.status).toBe(503);
     expect(body).toEqual({ status: "degraded" });
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
   });
 
-  it("returns 429 when rate limited", async () => {
+  it("returns 429 when rate limited in local", async () => {
     checkRateLimitMock.mockReturnValue({
       allowed: false,
       retryAfterSeconds: 30,

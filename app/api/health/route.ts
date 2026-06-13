@@ -9,32 +9,31 @@ import {
   buildHealthResponse,
   buildRateLimitedHealthResponse,
 } from "@/lib/health/response";
-import { getRequestClientIp } from "@/lib/security/client-ip";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 
-const HEALTH_RATE_LIMIT = 60;
-const HEALTH_RATE_WINDOW_MS = 60_000;
+const LOCAL_HEALTH_RATE_LIMIT = 60;
+const LOCAL_HEALTH_RATE_WINDOW_MS = 60_000;
 
 export async function GET() {
   const exposeDatabase = isLocalEnv(env.APP_ENV);
-  const clientIp = await getRequestClientIp({
-    trustProxy: !exposeDatabase,
-  });
-  const rateLimit = checkRateLimit(
-    `health:${clientIp}`,
-    HEALTH_RATE_LIMIT,
-    HEALTH_RATE_WINDOW_MS,
-  );
 
-  if (!rateLimit.allowed) {
-    const { status, body } = buildRateLimitedHealthResponse();
+  if (exposeDatabase) {
+    const rateLimit = checkRateLimit(
+      "health:local",
+      LOCAL_HEALTH_RATE_LIMIT,
+      LOCAL_HEALTH_RATE_WINDOW_MS,
+    );
 
-    return NextResponse.json(body, {
-      status,
-      headers: {
-        "Retry-After": String(rateLimit.retryAfterSeconds),
-      },
-    });
+    if (!rateLimit.allowed) {
+      const { status, body } = buildRateLimitedHealthResponse();
+
+      return NextResponse.json(body, {
+        status,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+        },
+      });
+    }
   }
 
   try {
