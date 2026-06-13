@@ -34,19 +34,11 @@ Open [http://localhost:3000](http://localhost:3000). The landing page shows data
 
 To recreate `.env`, run `pnpm setup -- --force`.
 
-Use `pnpm setup -- --env dev` or `pnpm setup -- --env prod` for deployment templates. See [docs/environments.md](docs/environments.md).
-
 ## Environments
 
-| Target | Command | Notes |
-|--------|---------|-------|
-| Local | `pnpm setup` | Default. Uses Docker Postgres on this machine. |
-| Dev | `pnpm setup -- --env dev` | Staging on your domain; set `DEV_ALLOWED_CIDRS` for IP allowlisting. |
-| Prod | `pnpm setup -- --env prod` | Production secrets and URLs. |
+Phase 0 runs on **local only**. Use `pnpm setup` (default) with Docker Postgres on this machine.
 
-`APP_ENV` (`local` \| `dev` \| `prod`) is validated at startup and is separate from `NODE_ENV`.
-
-Deployed builds (`dev` / `prod`) require valid env vars at build time because server modules validate on import. See [docs/environments.md](docs/environments.md#build-and-ci).
+`APP_ENV` also supports `dev` and `prod` in code and env templates for later deployment (Phase 9). Those targets are not set up yet. See [docs/environments.md](docs/environments.md) when you are ready to deploy.
 
 ## Security
 
@@ -58,7 +50,7 @@ Deployed builds (`dev` / `prod`) require valid env vars at build time because se
 ## Documentation
 
 - [Phase 0 foundation](docs/phase-0-foundation.md): architecture decisions and local environment setup.
-- [Environments](docs/environments.md): local, dev, and prod configuration.
+- [Environments](docs/environments.md): local setup today; dev/prod templates for later phases.
 - [Testing](docs/testing.md): unit test and coverage policy.
 
 ## Project status

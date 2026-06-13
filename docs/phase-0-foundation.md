@@ -16,13 +16,13 @@ Phase 0 has no application tables. Database connectivity is verified with `SELEC
 
 Server environment variables are validated in `lib/env.ts` using Zod (`lib/env-schema.ts`). The app fails fast at startup when required variables are missing or invalid. Error messages list field names only, never values.
 
-Three deployment targets are supported via `APP_ENV`:
+Three `APP_ENV` values are defined in code and templates:
 
-- **local**: developer machines (`localhost`, Docker Postgres)
-- **dev**: shared staging on a dev subdomain, optionally IP-restricted via `DEV_ALLOWED_CIDRS`
-- **prod**: customer-facing production
+- **local** (Phase 0): developer machines (`localhost`, Docker Postgres). This is the only target in use today.
+- **dev** (Phase 9): shared staging on a dev subdomain, optionally IP-restricted via `DEV_ALLOWED_CIDRS`
+- **prod** (Phase 9): customer-facing production
 
-See [environments.md](environments.md) for templates and setup commands.
+See [environments.md](environments.md) for local setup and future deployment templates.
 
 Local setup uses `pnpm setup`, which runs `scripts/setup-env.sh`:
 
