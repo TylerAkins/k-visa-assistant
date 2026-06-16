@@ -44,7 +44,7 @@ export async function verifyEmailService(
   input: Record<string, FormDataEntryValue | null>,
   clientIp: string,
 ): Promise<ActionResult> {
-  const rateLimit = checkAuthRateLimits("verify", [`ip:${clientIp}`]);
+  const rateLimit = await checkAuthRateLimits("verify", [`ip:${clientIp}`]);
   if (!rateLimit.allowed) {
     return rateLimitError(rateLimit.retryAfterSeconds);
   }
@@ -114,7 +114,7 @@ export async function resendVerificationEmailService(
     return { success: false, error: "Your email is already verified." };
   }
 
-  const rateLimit = checkAuthRateLimits("resend", [
+  const rateLimit = await checkAuthRateLimits("resend", [
     `ip:${clientIp}`,
     `user:${authSession.user.id}`,
   ]);
@@ -145,7 +145,7 @@ export async function resendVerificationByEmailService(
     return { success: false, fieldErrors: formatZodErrors(parsed.error) };
   }
 
-  const rateLimit = checkAuthRateLimits("resend", [
+  const rateLimit = await checkAuthRateLimits("resend", [
     `ip:${clientIp}`,
     `email:${parsed.data.email}`,
   ]);

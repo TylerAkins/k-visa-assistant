@@ -37,30 +37,6 @@ async function sendVerificationEmail(
   });
 }
 
-async function resendVerificationForUnverifiedUser(
-  userId: string,
-  email: string,
-  passwordHash: string,
-): Promise<ActionResult> {
-  await db
-    .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
-    .where(eq(users.id, userId));
-
-  try {
-    const token = await createEmailVerificationToken(userId);
-    await sendVerificationEmail(email, token);
-  } catch {
-    return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
-  }
-
-  return {
-    success: true,
-    error: REGISTRATION_EMAIL_MESSAGE,
-    verificationEmailSent: true,
-  };
-}
-
 export async function registerUserService(
   input: Record<string, FormDataEntryValue | null>,
   clientIp: string,
@@ -75,7 +51,7 @@ export async function registerUserService(
     return { success: false, fieldErrors: formatZodErrors(parsed.error) };
   }
 
-  const rateLimit = checkAuthRateLimits("signup", [`ip:${clientIp}`]);
+  const rateLimit = await checkAuthRateLimits("signup", [`ip:${clientIp}`]);
   if (!rateLimit.allowed) {
     return rateLimitError(rateLimit.retryAfterSeconds);
   }
@@ -83,21 +59,13 @@ export async function registerUserService(
   const passwordHash = await hashPassword(parsed.data.password);
   const existingUser = await findUserByEmail(parsed.data.email);
 
-  if (existingUser?.emailVerified) {
+  if (existingUser) {
     await hashPassword(parsed.data.password);
     return {
       success: true,
       error: REGISTRATION_ACCOUNT_EXISTS_MESSAGE,
       verificationEmailSent: false,
     };
-  }
-
-  if (existingUser && !existingUser.emailVerified) {
-    return resendVerificationForUnverifiedUser(
-      existingUser.id,
-      existingUser.email,
-      passwordHash,
-    );
   }
 
   try {
@@ -129,15 +97,7 @@ export async function registerUserService(
     };
   } catch (error) {
     if (isPostgresUniqueViolation(error)) {
-      const racedUser = await findUserByEmail(parsed.data.email);
-      if (racedUser && !racedUser.emailVerified) {
-        return resendVerificationForUnverifiedUser(
-          racedUser.id,
-          racedUser.email,
-          passwordHash,
-        );
-      }
-
+      await hashPassword(parsed.data.password);
       return {
         success: true,
         error: REGISTRATION_ACCOUNT_EXISTS_MESSAGE,

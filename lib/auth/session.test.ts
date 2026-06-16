@@ -58,6 +58,7 @@ import {
   deleteSession,
   deleteUserSessions,
   getSession,
+  reissueUserSession,
   rotateSession,
 } from "@/lib/auth/session";
 
@@ -118,6 +119,12 @@ describe("session", () => {
 
   it("deletes all sessions for a user", async () => {
     await deleteUserSessions("user-1");
+    expect(mockDelete).toHaveBeenCalled();
+  });
+
+  it("reissues a fresh session after deleting all user sessions", async () => {
+    const session = await reissueUserSession("user-1");
+    expect(session.id).toBe("session-new");
     expect(mockDelete).toHaveBeenCalled();
   });
 });

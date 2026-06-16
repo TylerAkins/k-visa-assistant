@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/constants";
 import {
   clearPendingLoginCookie,
+  clearSessionCookie,
   getPendingLoginIdFromCookies,
   getSessionIdFromCookies,
   setPendingLoginCookie,
@@ -23,7 +24,7 @@ import {
   incrementPendingLoginAttempts,
 } from "@/lib/auth/pending-login";
 import { verifyLoginPassword } from "@/lib/auth/password";
-import { rotateSession } from "@/lib/auth/session";
+import { deleteSession, rotateSession } from "@/lib/auth/session";
 import {
   decryptTotpSecret,
   verifyRecoveryCode,
@@ -58,7 +59,7 @@ export async function loginUserService(
     return { success: false, fieldErrors: formatZodErrors(parsed.error) };
   }
 
-  const rateLimit = checkAuthRateLimits("login", [
+  const rateLimit = await checkAuthRateLimits("login", [
     `ip:${clientIp}`,
     `email:${parsed.data.email}`,
   ]);
@@ -87,6 +88,12 @@ export async function loginUserService(
     .limit(1);
 
   if (totp?.enabled) {
+    const currentSessionId = await getSessionIdFromCookies();
+    if (currentSessionId) {
+      await deleteSession(currentSessionId);
+      await clearSessionCookie();
+    }
+
     const pending = await createPendingLogin(user.id);
     await setPendingLoginCookie(pending.id);
     return { success: true, requiresTotp: true };
@@ -114,7 +121,7 @@ export async function verifyLoginTotpService(
     return { success: false, error: LOGIN_INVALID_MESSAGE };
   }
 
-  const rateLimit = checkAuthRateLimits("totp", [
+  const rateLimit = await checkAuthRateLimits("totp", [
     `pending:${pendingLoginId}`,
     `ip:${clientIp}`,
     `user:${pending.userId}`,

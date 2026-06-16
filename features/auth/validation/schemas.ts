@@ -70,5 +70,6 @@ export const disableTotpSchema = z.object({
 });
 
 export const regenerateRecoveryCodesSchema = z.object({
+  password: z.string().min(1, "Password is required"),
   code: z.string().regex(/^\d{6}$/, "Enter a 6-digit code"),
 });

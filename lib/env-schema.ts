@@ -42,6 +42,7 @@ export const envSchema = z
       .default("false")
       .transform((value) => value === "true"),
     TRUSTED_PROXY_CIDRS: z.string().optional(),
+    REDIS_URL: z.string().min(1).optional(),
   })
   .superRefine((data, context) => {
     if (
@@ -90,6 +91,14 @@ export const envSchema = z
           "TRUSTED_PROXY_CIDRS must be a comma-separated list of IPv4 CIDRs",
       });
     }
+
+    if (data.APP_ENV === "prod" && !data.REDIS_URL) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: "REDIS_URL is required when APP_ENV is prod",
+      });
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;
@@ -121,6 +130,7 @@ export function parseEnvConfig(
     DEV_ALLOWED_CIDRS: config.DEV_ALLOWED_CIDRS,
     TRUST_PROXY_HEADERS: config.TRUST_PROXY_HEADERS,
     TRUSTED_PROXY_CIDRS: config.TRUSTED_PROXY_CIDRS,
+    REDIS_URL: config.REDIS_URL,
   });
 
   if (!result.success) {

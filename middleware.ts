@@ -7,24 +7,50 @@ import {
   SESSION_COOKIE_NAME_HOST,
   SESSION_COOKIE_NAME_LOCAL,
 } from "@/lib/auth/constants";
+import {
+  getPendingLoginCookieReadOrder,
+  getSessionCookieReadOrder,
+} from "@/lib/auth/cookie-config";
+import type { AppEnvironment } from "@/lib/env-schema";
 import { parseSessionCookieValue } from "@/lib/auth/session-cookie";
 
 const guestPaths = ["/login", "/register", "/forgot-password"];
 const sensitiveTokenPaths = ["/verify-email", "/reset-password"];
 
+function getAppEnvironment(): AppEnvironment {
+  const appEnv = process.env.APP_ENV;
+  if (appEnv === "dev" || appEnv === "prod") {
+    return appEnv;
+  }
+
+  return "local";
+}
+
+function readRequestCookie(
+  request: NextRequest,
+  names: [string, string],
+): string | null {
+  for (const name of names) {
+    const value = request.cookies.get(name)?.value;
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 function getSessionCookieValue(request: NextRequest): string | null {
-  return (
-    request.cookies.get(SESSION_COOKIE_NAME_LOCAL)?.value ??
-    request.cookies.get(SESSION_COOKIE_NAME_HOST)?.value ??
-    null
+  return readRequestCookie(
+    request,
+    getSessionCookieReadOrder(getAppEnvironment()),
   );
 }
 
 function getPendingLoginCookieValue(request: NextRequest): string | null {
-  return (
-    request.cookies.get(PENDING_LOGIN_COOKIE_NAME_LOCAL)?.value ??
-    request.cookies.get(PENDING_LOGIN_COOKIE_NAME_HOST)?.value ??
-    null
+  return readRequestCookie(
+    request,
+    getPendingLoginCookieReadOrder(getAppEnvironment()),
   );
 }
 

@@ -7,7 +7,9 @@ import { generateURI } from "otplib";
 import { db } from "@/db";
 import { recoveryCodes, totpSettings, users } from "@/db/schema";
 import { getAuthSession } from "@/lib/auth/get-auth-session";
+import { setSessionCookie } from "@/lib/auth/cookies";
 import { verifyLoginPassword } from "@/lib/auth/password";
+import { reissueUserSession } from "@/lib/auth/session";
 import {
   decryptTotpSecret,
   encryptTotpSecret,
@@ -33,6 +35,11 @@ import {
   totpCodeSchema,
 } from "@/features/auth/validation/schemas";
 
+async function reissueAuthenticatedSession(userId: string): Promise<void> {
+  const session = await reissueUserSession(userId);
+  await setSessionCookie(session.id);
+}
+
 export async function beginTotpSetupService(
   input: Record<string, FormDataEntryValue | null>,
   clientIp: string,
@@ -50,7 +57,7 @@ export async function beginTotpSetupService(
     return { success: false, fieldErrors: formatZodErrors(parsed.error) };
   }
 
-  const rateLimit = checkAuthRateLimits("totp-setup", [
+  const rateLimit = await checkAuthRateLimits("totp-setup", [
     `ip:${clientIp}`,
     `user:${authSession.user.id}`,
   ]);
@@ -125,7 +132,7 @@ export async function confirmTotpSetupService(
     return unauthorizedResult();
   }
 
-  const rateLimit = checkAuthRateLimits("totp-setup", [
+  const rateLimit = await checkAuthRateLimits("totp-setup", [
     `ip:${clientIp}`,
     `user:${authSession.user.id}`,
   ]);
@@ -174,6 +181,8 @@ export async function confirmTotpSetupService(
     await tx.insert(recoveryCodes).values(hashedCodes);
   });
 
+  await reissueAuthenticatedSession(authSession.user.id);
+
   return { success: true, recoveryCodes: plaintextCodes };
 }
 
@@ -186,7 +195,7 @@ export async function disableTotpService(
     return unauthorizedResult();
   }
 
-  const rateLimit = checkAuthRateLimits("totp-disable", [
+  const rateLimit = await checkAuthRateLimits("totp-disable", [
     `ip:${clientIp}`,
     `user:${authSession.user.id}`,
   ]);
@@ -281,6 +290,8 @@ export async function disableTotpService(
       .where(eq(recoveryCodes.userId, authSession.user.id));
   });
 
+  await reissueAuthenticatedSession(authSession.user.id);
+
   return { success: true, error: "Two-factor authentication disabled." };
 }
 
@@ -293,7 +304,7 @@ export async function regenerateRecoveryCodesService(
     return unauthorizedResult();
   }
 
-  const rateLimit = checkAuthRateLimits("recovery-regen", [
+  const rateLimit = await checkAuthRateLimits("recovery-regen", [
     `ip:${clientIp}`,
     `user:${authSession.user.id}`,
   ]);
@@ -302,11 +313,31 @@ export async function regenerateRecoveryCodesService(
   }
 
   const parsed = regenerateRecoveryCodesSchema.safeParse({
+    password: input.password,
     code: input.code,
   });
 
   if (!parsed.success) {
     return { success: false, fieldErrors: formatZodErrors(parsed.error) };
+  }
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, authSession.user.id))
+    .limit(1);
+
+  if (!user) {
+    return unauthorizedResult();
+  }
+
+  const passwordValid = await verifyLoginPassword(
+    { passwordHash: user.passwordHash },
+    parsed.data.password,
+  );
+
+  if (!passwordValid) {
+    return { success: false, error: "Invalid email or password." };
   }
 
   const [totp] = await db

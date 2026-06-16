@@ -10,16 +10,36 @@ import {
 } from "@/lib/auth/constants";
 import {
   buildAuthCookieOptions,
+  getAlternatePendingLoginCookieName,
+  getAlternateSessionCookieName,
   getPendingLoginCookieMaxAge,
   getPendingLoginCookieName,
+  getPendingLoginCookieReadOrder,
   getSessionCookieMaxAge,
   getSessionCookieName,
+  getSessionCookieReadOrder,
 } from "@/lib/auth/cookie-config";
 import {
   parseSessionCookieValue,
   signSessionCookieValue,
 } from "@/lib/auth/session-cookie";
 import { env } from "@/lib/env";
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+function readCookieValue(
+  cookieStore: CookieStore,
+  names: [string, string],
+): string | null {
+  for (const name of names) {
+    const value = cookieStore.get(name)?.value;
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
 
 export async function setSessionCookie(sessionId: string): Promise<void> {
   const cookieStore = await cookies();
@@ -32,6 +52,7 @@ export async function setSessionCookie(sessionId: string): Promise<void> {
     signedValue,
     buildAuthCookieOptions(env.APP_ENV, getSessionCookieMaxAge()),
   );
+  cookieStore.delete(getAlternateSessionCookieName(env.APP_ENV));
 }
 
 export async function clearSessionCookie(): Promise<void> {
@@ -42,9 +63,10 @@ export async function clearSessionCookie(): Promise<void> {
 
 export async function getSessionIdFromCookies(): Promise<string | null> {
   const cookieStore = await cookies();
-  const local = cookieStore.get(SESSION_COOKIE_NAME_LOCAL)?.value;
-  const host = cookieStore.get(SESSION_COOKIE_NAME_HOST)?.value;
-  const rawValue = local ?? host ?? null;
+  const rawValue = readCookieValue(
+    cookieStore,
+    getSessionCookieReadOrder(env.APP_ENV),
+  );
 
   if (!rawValue) {
     return null;
@@ -56,8 +78,7 @@ export async function getSessionIdFromCookies(): Promise<string | null> {
 export async function hasRawSessionCookieValue(): Promise<boolean> {
   const cookieStore = await cookies();
   return Boolean(
-    cookieStore.get(SESSION_COOKIE_NAME_LOCAL)?.value ??
-      cookieStore.get(SESSION_COOKIE_NAME_HOST)?.value,
+    readCookieValue(cookieStore, getSessionCookieReadOrder(env.APP_ENV)),
   );
 }
 
@@ -74,6 +95,7 @@ export async function setPendingLoginCookie(
     signedValue,
     buildAuthCookieOptions(env.APP_ENV, getPendingLoginCookieMaxAge()),
   );
+  cookieStore.delete(getAlternatePendingLoginCookieName(env.APP_ENV));
 }
 
 export async function clearPendingLoginCookie(): Promise<void> {
@@ -84,9 +106,10 @@ export async function clearPendingLoginCookie(): Promise<void> {
 
 export async function getPendingLoginIdFromCookies(): Promise<string | null> {
   const cookieStore = await cookies();
-  const local = cookieStore.get(PENDING_LOGIN_COOKIE_NAME_LOCAL)?.value;
-  const host = cookieStore.get(PENDING_LOGIN_COOKIE_NAME_HOST)?.value;
-  const rawValue = local ?? host ?? null;
+  const rawValue = readCookieValue(
+    cookieStore,
+    getPendingLoginCookieReadOrder(env.APP_ENV),
+  );
 
   if (!rawValue) {
     return null;

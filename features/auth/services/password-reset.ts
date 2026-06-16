@@ -43,7 +43,7 @@ export async function requestPasswordResetService(
     return { success: false, fieldErrors: formatZodErrors(parsed.error) };
   }
 
-  const rateLimit = checkAuthRateLimits("reset", [
+  const rateLimit = await checkAuthRateLimits("reset", [
     `ip:${clientIp}`,
     `email:${parsed.data.email}`,
   ]);
@@ -77,7 +77,7 @@ export async function resetPasswordService(
   input: Record<string, FormDataEntryValue | null>,
   clientIp: string,
 ): Promise<ActionResult> {
-  const rateLimit = checkAuthRateLimits("reset", [`ip:${clientIp}`]);
+  const rateLimit = await checkAuthRateLimits("reset", [`ip:${clientIp}`]);
   if (!rateLimit.allowed) {
     return rateLimitError(rateLimit.retryAfterSeconds);
   }

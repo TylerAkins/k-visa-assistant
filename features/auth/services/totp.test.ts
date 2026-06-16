@@ -54,7 +54,25 @@ vi.mock("@/features/auth/services/user-repository", () => ({
   markRecoveryCodeUsed: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/cookies", () => ({
+  setSessionCookie: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth/session")>();
+  return {
+    ...actual,
+    reissueUserSession: vi.fn().mockResolvedValue({
+      id: "session-new",
+      userId: "user-1",
+      expiresAt: new Date(Date.now() + 60_000),
+    }),
+  };
+});
+
+import { setSessionCookie } from "@/lib/auth/cookies";
 import { getAuthSession } from "@/lib/auth/get-auth-session";
+import { reissueUserSession } from "@/lib/auth/session";
 import { verifyTotpCode } from "@/lib/auth/totp";
 import {
   beginTotpSetupService,
@@ -100,7 +118,12 @@ function mockBeginSetupSelects(
 describe("totp services", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockDb.select.mockReset();
     vi.mocked(getAuthSession).mockResolvedValue(authSession);
+    const { markRecoveryCodeUsed } = await import(
+      "@/features/auth/services/user-repository"
+    );
+    vi.mocked(markRecoveryCodeUsed).mockResolvedValue(true);
     const { resetRateLimitsForTests } = await import("@/lib/security/rate-limit");
     resetRateLimitsForTests();
     mockDb.insert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
@@ -233,14 +256,41 @@ describe("totp services", () => {
   });
 
   it("regenerates recovery codes", async () => {
-    selectLimit([{ id: "totp-1", enabled: true, secretEncrypted: "enc" }]);
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockDb.select
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ passwordHash }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              { id: "totp-1", enabled: true, secretEncrypted: "enc" },
+            ]),
+          }),
+        }),
+      });
     vi.mocked(verifyTotpCode).mockResolvedValue(true);
     const result = await regenerateRecoveryCodesService(
-      { code: "123456" },
+      { password: "SecurePass123!", code: "123456" },
       "127.0.0.1",
     );
     expect(result.success).toBe(true);
     expect(result.recoveryCodes).toHaveLength(2);
+  });
+
+  it("reissues session after confirming totp setup", async () => {
+    selectLimit([{ id: "totp-1", secretEncrypted: "enc", enabled: false }]);
+    vi.mocked(verifyTotpCode).mockResolvedValue(true);
+
+    const result = await confirmTotpSetupService({ code: "123456" }, "127.0.0.1");
+    expect(result.success).toBe(true);
+    expect(reissueUserSession).toHaveBeenCalledWith("user-1");
+    expect(setSessionCookie).toHaveBeenCalledWith("session-new");
   });
 
   it("rejects invalid confirm code", async () => {
@@ -310,9 +360,24 @@ describe("totp services", () => {
   });
 
   it("rejects regenerate when totp disabled", async () => {
-    selectLimit([]);
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockDb.select
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ passwordHash }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
     const result = await regenerateRecoveryCodesService(
-      { code: "123456" },
+      { password: "SecurePass123!", code: "123456" },
       "127.0.0.1",
     );
     expect(result.success).toBe(false);
@@ -360,10 +425,27 @@ describe("totp services", () => {
   });
 
   it("rejects regenerate with invalid code", async () => {
-    selectLimit([{ id: "totp-1", enabled: true, secretEncrypted: "enc" }]);
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockDb.select
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ passwordHash }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              { id: "totp-1", enabled: true, secretEncrypted: "enc" },
+            ]),
+          }),
+        }),
+      });
     vi.mocked(verifyTotpCode).mockResolvedValue(false);
     const result = await regenerateRecoveryCodesService(
-      { code: "123456" },
+      { password: "SecurePass123!", code: "123456" },
       "127.0.0.1",
     );
     expect(result.success).toBe(false);
@@ -440,7 +522,10 @@ describe("totp services", () => {
   });
 
   it("returns field errors for invalid recovery regen input", async () => {
-    const result = await regenerateRecoveryCodesService({ code: "abc" }, "127.0.0.1");
+    const result = await regenerateRecoveryCodesService(
+      { password: "SecurePass123!", code: "abc" },
+      "127.0.0.1",
+    );
     expect(result.success).toBe(false);
     expect(result.fieldErrors).toBeDefined();
   });
@@ -503,20 +588,30 @@ describe("totp services", () => {
   it("returns unauthorized for recovery regeneration when unauthenticated", async () => {
     vi.mocked(getAuthSession).mockResolvedValue(null);
     const result = await regenerateRecoveryCodesService(
-      { code: "123456" },
+      { password: "SecurePass123!", code: "123456" },
       "127.0.0.1",
     );
     expect(result.success).toBe(false);
   });
 
   it("returns rate limit error during recovery regeneration", async () => {
-    selectLimit([{ id: "totp-1", enabled: true, secretEncrypted: "enc" }]);
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockDb.select.mockImplementation(() => ({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{ passwordHash }]),
+        }),
+      }),
+    }));
     vi.mocked(verifyTotpCode).mockResolvedValue(true);
     for (let index = 0; index < 3; index += 1) {
-      await regenerateRecoveryCodesService({ code: "123456" }, "127.0.0.1-recovery");
+      await regenerateRecoveryCodesService(
+        { password: "SecurePass123!", code: "123456" },
+        "127.0.0.1-recovery",
+      );
     }
     const result = await regenerateRecoveryCodesService(
-      { code: "123456" },
+      { password: "SecurePass123!", code: "123456" },
       "127.0.0.1-recovery",
     );
     expect(result.success).toBe(false);

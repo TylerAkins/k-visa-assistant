@@ -18,7 +18,7 @@ export async function GET() {
   const exposeDatabase = isLocalEnv(env.APP_ENV);
 
   if (exposeDatabase) {
-    const rateLimit = checkRateLimit(
+    const rateLimit = await checkRateLimit(
       "health:local",
       LOCAL_HEALTH_RATE_LIMIT,
       LOCAL_HEALTH_RATE_WINDOW_MS,

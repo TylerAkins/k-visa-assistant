@@ -211,10 +211,23 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
               </form>
 
               <FormMessage message={regenState.error} />
+              {regenState.fieldErrors?.password ? (
+                <FormMessage message={regenState.fieldErrors.password[0]} />
+              ) : null}
               {regenState.fieldErrors?.code ? (
                 <FormMessage message={regenState.fieldErrors.code[0]} />
               ) : null}
               <form action={regenAction} className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="regen-password">Password</Label>
+                  <Input
+                    id="regen-password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="regen-code">Authenticator code</Label>
                   <Input

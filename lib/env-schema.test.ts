@@ -100,9 +100,23 @@ describe("envSchema", () => {
       DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
       SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
       ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
+      REDIS_URL: "redis://127.0.0.1:6379",
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("requires REDIS_URL for prod", () => {
+    const result = envSchema.safeParse({
+      APP_ENV: "prod",
+      NODE_ENV: "production",
+      APP_URL: "https://app.example.com",
+      DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+      SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+      ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("rejects missing required fields", () => {

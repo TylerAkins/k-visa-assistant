@@ -70,6 +70,7 @@ describe("cookies", () => {
       "signed.session-456.sig",
       expect.objectContaining({ httpOnly: true, secure: false }),
     );
+    expect(cookieStore.delete).toHaveBeenCalledWith("__Host-session");
 
     await clearSessionCookie();
     expect(cookieStore.delete).toHaveBeenCalledWith("session");
@@ -83,6 +84,7 @@ describe("cookies", () => {
       "signed.pending-456.sig",
       expect.objectContaining({ httpOnly: true }),
     );
+    expect(cookieStore.delete).toHaveBeenCalledWith("__Host-pending-login");
 
     await clearPendingLoginCookie();
     expect(cookieStore.delete).toHaveBeenCalledWith("pending-login");
@@ -95,7 +97,47 @@ describe("cookies", () => {
     await expect(getPendingLoginIdFromCookies()).resolves.toBeNull();
   });
 
-  it("prefers local session cookie over host cookie", async () => {
+  it("prefers host session cookie over legacy cookie in prod env", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/env", () => ({
+      env: {
+        APP_ENV: "prod",
+        SESSION_SECRET: "test-session-secret-at-least-32-characters",
+      },
+    }));
+    vi.doMock("next/headers", () => ({
+      cookies: vi.fn().mockResolvedValue(cookieStore),
+    }));
+    vi.doMock("@/lib/auth/session-cookie", () => ({
+      signSessionCookieValue: vi.fn().mockImplementation(async (sessionId: string) => {
+        return `signed.${sessionId}.sig`;
+      }),
+      parseSessionCookieValue: vi.fn().mockImplementation(async (value: string) => {
+        if (value.startsWith("signed.")) {
+          return value.split(".")[1] ?? null;
+        }
+        return null;
+      }),
+    }));
+
+    cookieStore.get.mockImplementation((name: string) => {
+      if (name === "session") {
+        return { value: "signed.local-session.sig" };
+      }
+      if (name === "__Host-session") {
+        return { value: "signed.host-session.sig" };
+      }
+      return undefined;
+    });
+
+    const { getSessionIdFromCookies: getProdSessionId } = await import(
+      "@/lib/auth/cookies"
+    );
+
+    await expect(getProdSessionId()).resolves.toBe("host-session");
+  });
+
+  it("prefers local session cookie over host cookie in local env", async () => {
     cookieStore.get.mockImplementation((name: string) => {
       if (name === "session") {
         return { value: "signed.local-session.sig" };
@@ -152,5 +194,6 @@ describe("cookies", () => {
       "signed.session-prod.sig",
       expect.objectContaining({ secure: true }),
     );
+    expect(cookieStore.delete).toHaveBeenCalledWith("session");
   });
 });

@@ -1,4 +1,7 @@
-import { checkRateLimit, type RateLimitResult } from "@/lib/security/rate-limit";
+import {
+  checkRateLimit,
+  type RateLimitResult,
+} from "@/lib/security/rate-limit";
 
 export type AuthRateLimitAction =
   | "login"
@@ -23,25 +26,30 @@ const PRESETS: Record<
   resend: { limit: 3, windowMs: 60 * 60 * 1000 },
   "totp-setup": { limit: 5, windowMs: 15 * 60 * 1000 },
   "totp-disable": { limit: 5, windowMs: 15 * 60 * 1000 },
-  "recovery-regen": { limit: 3, windowMs: 60 * 60 * 1000 },
+  "recovery-regen": { limit: 3, windowMs: 15 * 60 * 1000 },
 };
 
-export function checkAuthRateLimit(
+export async function checkAuthRateLimit(
   action: AuthRateLimitAction,
   key: string,
   now?: number,
-): RateLimitResult {
+): Promise<RateLimitResult> {
   const preset = PRESETS[action];
-  return checkRateLimit(`auth:${action}:${key}`, preset.limit, preset.windowMs, now);
+  return checkRateLimit(
+    `auth:${action}:${key}`,
+    preset.limit,
+    preset.windowMs,
+    now,
+  );
 }
 
-export function checkAuthRateLimits(
+export async function checkAuthRateLimits(
   action: AuthRateLimitAction,
   keys: string[],
   now?: number,
-): RateLimitResult {
+): Promise<RateLimitResult> {
   for (const key of keys) {
-    const result = checkAuthRateLimit(action, key, now);
+    const result = await checkAuthRateLimit(action, key, now);
     if (!result.allowed) {
       return result;
     }
@@ -63,7 +71,7 @@ export function getAuthRateLimitKeys(action: AuthRateLimitAction): string[] {
     case "verify":
       return ["auth:verify:ip"];
     case "resend":
-      return ["auth:resend:ip", "auth:resend:user"];
+      return ["auth:resend:ip", "auth:resend:email"];
     case "totp-setup":
       return ["auth:totp-setup:ip", "auth:totp-setup:user"];
     case "totp-disable":

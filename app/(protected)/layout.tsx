@@ -14,5 +14,9 @@ export default async function ProtectedLayout({
     redirect("/login");
   }
 
+  if (!user.emailVerified) {
+    redirect("/login");
+  }
+
   return <>{children}</>;
 }

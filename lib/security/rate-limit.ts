@@ -1,92 +1,89 @@
+import { checkRedisRateLimit } from "@/lib/security/rate-limit-redis";
+
+export type RateLimitResult =
+  | { allowed: true }
+  | { allowed: false; retryAfterSeconds: number };
+
 type RateLimitBucket = {
   count: number;
   windowStart: number;
   windowMs: number;
 };
 
-const buckets = new Map<string, RateLimitBucket>();
+type BucketStore = Map<string, RateLimitBucket>;
+
+const authBuckets: BucketStore = new Map();
+const generalBuckets: BucketStore = new Map();
 const lastPurgeAtByWindow = new Map<number, number>();
 
-const MAX_BUCKETS = 10_000;
+const MAX_AUTH_BUCKETS = 10_000;
+const MAX_GENERAL_BUCKETS = 10_000;
 
-export type RateLimitResult =
-  | { allowed: true }
-  | { allowed: false; retryAfterSeconds: number };
+function getBucketStore(key: string): { store: BucketStore; maxBuckets: number } {
+  if (key.startsWith("auth:")) {
+    return { store: authBuckets, maxBuckets: MAX_AUTH_BUCKETS };
+  }
 
-function purgeExpiredBuckets(now: number): void {
-  for (const [key, bucket] of buckets) {
+  return { store: generalBuckets, maxBuckets: MAX_GENERAL_BUCKETS };
+}
+
+function purgeExpiredBuckets(store: BucketStore, now: number): void {
+  for (const [key, bucket] of store) {
     if (now - bucket.windowStart >= bucket.windowMs) {
-      buckets.delete(key);
+      store.delete(key);
     }
   }
 }
 
-function enforceMaxBuckets(): void {
-  if (buckets.size <= MAX_BUCKETS) {
+function enforceMaxBuckets(store: BucketStore, maxBuckets: number): void {
+  if (store.size <= maxBuckets) {
     return;
   }
 
   const now = Date.now();
-  purgeExpiredBuckets(now);
+  purgeExpiredBuckets(store, now);
 
-  if (buckets.size <= MAX_BUCKETS) {
+  if (store.size <= maxBuckets) {
     return;
   }
 
-  const evictOldest = (entries: Array<[string, RateLimitBucket]>) => {
-    const sorted = entries.sort(
-      (left, right) => left[1].windowStart - right[1].windowStart,
-    );
-    const overflow = buckets.size - MAX_BUCKETS;
-
-    for (const [key] of sorted.slice(0, overflow)) {
-      buckets.delete(key);
-    }
-  };
-
-  const nonAuthEntries = [...buckets.entries()].filter(
-    ([key]) => !key.startsWith("auth:"),
+  const sorted = [...store.entries()].sort(
+    (left, right) => left[1].windowStart - right[1].windowStart,
   );
+  const overflow = store.size - maxBuckets;
 
-  if (nonAuthEntries.length > 0) {
-    evictOldest(nonAuthEntries);
-  }
-
-  if (buckets.size > MAX_BUCKETS) {
-    const authEntries = [...buckets.entries()].filter(([key]) =>
-      key.startsWith("auth:"),
-    );
-    if (authEntries.length > 0 && process.env.NODE_ENV !== "test") {
-      console.warn(
-        `[rate-limit] Evicting auth buckets after non-auth eviction (${authEntries.length} auth buckets remain before eviction)`,
-      );
-    }
-    evictOldest([...buckets.entries()]);
+  for (const [key] of sorted.slice(0, overflow)) {
+    store.delete(key);
   }
 }
 
-function maybePurgeExpiredBuckets(now: number, windowMs: number): void {
+function maybePurgeExpiredBuckets(
+  store: BucketStore,
+  now: number,
+  windowMs: number,
+): void {
   const lastPurgeAt = lastPurgeAtByWindow.get(windowMs) ?? 0;
 
-  if (now - lastPurgeAt >= windowMs || buckets.size > MAX_BUCKETS) {
-    purgeExpiredBuckets(now);
+  if (now - lastPurgeAt >= windowMs || store.size > MAX_GENERAL_BUCKETS) {
+    purgeExpiredBuckets(store, now);
     lastPurgeAtByWindow.set(windowMs, now);
   }
 }
 
-export function checkRateLimit(
+function checkMemoryRateLimit(
   key: string,
   limit: number,
   windowMs: number,
   now = Date.now(),
 ): RateLimitResult {
-  maybePurgeExpiredBuckets(now, windowMs);
+  const { store, maxBuckets } = getBucketStore(key);
+  maybePurgeExpiredBuckets(store, now, windowMs);
 
-  const bucket = buckets.get(key);
+  const bucket = store.get(key);
 
   if (!bucket || now - bucket.windowStart >= bucket.windowMs) {
-    buckets.set(key, { count: 1, windowStart: now, windowMs });
-    enforceMaxBuckets();
+    store.set(key, { count: 1, windowStart: now, windowMs });
+    enforceMaxBuckets(store, maxBuckets);
     return { allowed: true };
   }
 
@@ -102,11 +99,37 @@ export function checkRateLimit(
   return { allowed: true };
 }
 
+function shouldUseRedis(): boolean {
+  return Boolean(process.env.REDIS_URL);
+}
+
+export async function checkRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+  now = Date.now(),
+): Promise<RateLimitResult> {
+  if (shouldUseRedis()) {
+    return checkRedisRateLimit(key, limit, windowMs, now);
+  }
+
+  return checkMemoryRateLimit(key, limit, windowMs, now);
+}
+
 export function resetRateLimitsForTests(): void {
-  buckets.clear();
+  authBuckets.clear();
+  generalBuckets.clear();
   lastPurgeAtByWindow.clear();
 }
 
 export function getRateLimitBucketCountForTests(): number {
-  return buckets.size;
+  return authBuckets.size + generalBuckets.size;
+}
+
+export function getAuthRateLimitBucketCountForTests(): number {
+  return authBuckets.size;
+}
+
+export function getGeneralRateLimitBucketCountForTests(): number {
+  return generalBuckets.size;
 }

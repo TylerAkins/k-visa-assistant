@@ -19,6 +19,42 @@ export function getPendingLoginCookieName(appEnv: AppEnvironment): string {
     : PENDING_LOGIN_COOKIE_NAME_HOST;
 }
 
+export function getSessionCookieReadOrder(
+  appEnv: AppEnvironment,
+): [string, string] {
+  if (isLocalEnv(appEnv)) {
+    return [SESSION_COOKIE_NAME_LOCAL, SESSION_COOKIE_NAME_HOST];
+  }
+
+  return [SESSION_COOKIE_NAME_HOST, SESSION_COOKIE_NAME_LOCAL];
+}
+
+export function getPendingLoginCookieReadOrder(
+  appEnv: AppEnvironment,
+): [string, string] {
+  if (isLocalEnv(appEnv)) {
+    return [PENDING_LOGIN_COOKIE_NAME_LOCAL, PENDING_LOGIN_COOKIE_NAME_HOST];
+  }
+
+  return [PENDING_LOGIN_COOKIE_NAME_HOST, PENDING_LOGIN_COOKIE_NAME_LOCAL];
+}
+
+export function getAlternateSessionCookieName(
+  appEnv: AppEnvironment,
+): string {
+  return isLocalEnv(appEnv)
+    ? SESSION_COOKIE_NAME_HOST
+    : SESSION_COOKIE_NAME_LOCAL;
+}
+
+export function getAlternatePendingLoginCookieName(
+  appEnv: AppEnvironment,
+): string {
+  return isLocalEnv(appEnv)
+    ? PENDING_LOGIN_COOKIE_NAME_HOST
+    : PENDING_LOGIN_COOKIE_NAME_LOCAL;
+}
+
 export function buildAuthCookieOptions(appEnv: AppEnvironment, maxAgeMs: number) {
   return {
     httpOnly: true as const,

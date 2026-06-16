@@ -99,3 +99,8 @@ export async function rotateSession(
 
   return createSession(userId);
 }
+
+export async function reissueUserSession(userId: string): Promise<AuthSession> {
+  await deleteUserSessions(userId);
+  return createSession(userId);
+}

@@ -89,7 +89,7 @@ describe("registerUserService", () => {
     expect(result.verificationEmailSent).toBe(false);
   });
 
-  it("updates password when re-registering an unverified account", async () => {
+  it("does not overwrite password when re-registering an unverified account", async () => {
     const { db } = await import("@/db");
     vi.mocked(findUserByEmail).mockResolvedValueOnce({
       id: "user-1",
@@ -110,8 +110,8 @@ describe("registerUserService", () => {
     );
 
     expect(result.success).toBe(true);
-    expect(result.verificationEmailSent).toBe(true);
-    expect(db.update).toHaveBeenCalled();
+    expect(result.verificationEmailSent).toBe(false);
+    expect(db.update).not.toHaveBeenCalled();
   });
 
   it("returns rate limit error when exceeded", async () => {

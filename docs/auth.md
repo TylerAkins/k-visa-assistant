@@ -57,6 +57,11 @@ Cookie attributes:
 - Guest routes no longer redirect purely on cookie signature; login page redirects when a live session exists.
 - Invalid signed cookies are cleared on guest routes by middleware (session and pending-login separately).
 - Unverified users can resend verification email from the login page without signing in.
+- Production reads `__Host-*` cookies before legacy names; setting a session clears the alternate cookie name.
+- Re-registering an existing unverified email returns a generic message without changing the password (use guest resend on login).
+- Enabling or disabling TOTP reissues the session and invalidates all other sessions.
+- Recovery-code regeneration requires password and TOTP.
+- Starting TOTP login clears any existing session cookie.
 
 ## Email verification
 
@@ -95,7 +100,7 @@ TOTP verification uses a ±1 step window (30 seconds).
 
 ## Rate limiting
 
-In-memory per-process limits in `lib/security/auth-rate-limit.ts`:
+In-memory per-process limits in `lib/security/auth-rate-limit.ts` for local development. Production requires `REDIS_URL` for shared limits across instances.
 
 - Login: IP + email (10 / 15 min)
 - TOTP: pending ID + IP + user (5 / 5 min)
@@ -107,6 +112,7 @@ In-memory per-process limits in `lib/security/auth-rate-limit.ts`:
 | Variable | Purpose |
 |----------|---------|
 | `SESSION_SECRET` | HMAC signing for session cookies (min 32 chars) |
+| `REDIS_URL` | Redis connection URL (required when `APP_ENV=prod`) |
 | `TRUST_PROXY_HEADERS` | When `true`, trust `X-Forwarded-For` only when `x-connecting-peer` is in `TRUSTED_PROXY_CIDRS` |
 | `TRUSTED_PROXY_CIDRS` | Comma-separated IPv4 CIDRs for trusted reverse proxies (must match `x-connecting-peer`) |
 | `ENCRYPTION_KEY` | TOTP secret encryption at rest (min 32 chars) |
@@ -126,7 +132,6 @@ In-memory per-process limits in `lib/security/auth-rate-limit.ts`:
 
 ## Known Phase 1 limitations
 
-- Rate limiting is in-memory (resets on deploy; not multi-instance)
 - No Content-Security-Policy yet (Phase 9)
 - No permanent account lockout beyond rate limits
 - No logged-in password change flow
