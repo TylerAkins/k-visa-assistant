@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { db } from "@/lib/db";
-import { checkDatabaseConnection } from "@/lib/db/health";
+import { db } from "@/db";
+import { checkDatabaseConnection } from "@/db/health";
 import { env } from "@/lib/env";
 import { isLocalEnv } from "@/lib/env-schema";
 import { getSafeErrorMessage } from "@/lib/errors";
@@ -18,7 +18,7 @@ export async function GET() {
   const exposeDatabase = isLocalEnv(env.APP_ENV);
 
   if (exposeDatabase) {
-    const rateLimit = checkRateLimit(
+    const rateLimit = await checkRateLimit(
       "health:local",
       LOCAL_HEALTH_RATE_LIMIT,
       LOCAL_HEALTH_RATE_WINDOW_MS,

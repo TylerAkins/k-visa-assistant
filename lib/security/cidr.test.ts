@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isValidCidrList, isValidIpv4Cidr } from "@/lib/security/cidr";
+import { isIpv4InAnyCidr, isIpv4InCidr, isValidCidrList, isValidIpv4Cidr } from "@/lib/security/cidr";
 
 describe("isValidIpv4Cidr", () => {
   it("accepts valid IPv4 CIDR values", () => {
@@ -33,5 +33,22 @@ describe("isValidCidrList", () => {
   it("rejects empty and malformed lists", () => {
     expect(isValidCidrList("")).toBe(false);
     expect(isValidCidrList("203.0.113.0/24,invalid")).toBe(false);
+  });
+});
+
+describe("isIpv4InCidr", () => {
+  it("matches addresses inside a CIDR block", () => {
+    expect(isIpv4InCidr("10.0.0.5", "10.0.0.0/8")).toBe(true);
+    expect(isIpv4InCidr("203.0.113.10", "203.0.113.0/24")).toBe(true);
+  });
+
+  it("rejects addresses outside a CIDR block", () => {
+    expect(isIpv4InCidr("203.0.114.1", "203.0.113.0/24")).toBe(false);
+  });
+
+  it("checks comma-separated CIDR lists", () => {
+    expect(isIpv4InAnyCidr("10.1.2.3", "203.0.113.0/24,10.0.0.0/8")).toBe(
+      true,
+    );
   });
 });

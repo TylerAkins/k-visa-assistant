@@ -11,16 +11,27 @@ pnpm test:coverage
 
 ## Coverage policy
 
-We enforce a **practical senior bar**, not 100% repo-wide coverage.
+We enforce a **practical senior bar**: tests should prove behavior, not chase percentages.
 
-### In scope (90% minimum)
+### Global thresholds (in scope code only)
 
-Coverage thresholds apply to business logic under:
+`pnpm test:coverage` enforces **repo-wide** minimums on business logic:
 
-- `lib/**/*.ts`
-- `features/**/*.ts` (when added in later phases)
+| Metric | Minimum |
+|--------|---------|
+| Lines / statements / functions | 80% |
+| Branches | 75% |
 
-Run `pnpm test:coverage` to verify. The command fails if thresholds are not met.
+There are **no per-file thresholds**. A single orchestration file with thin glue does not need branch-perfect coverage if the important paths are tested elsewhere.
+
+Coverage is measured under `lib/**`, `features/**`, and `db/**` (minus exclusions below). Open `coverage/index.html` after a coverage run for the interactive report.
+
+### Philosophy
+
+- Test **contracts and behavior**: validation, auth flows, security branches, error messages users see.
+- Skip **framework glue** and implementation trivia.
+- Prefer a few strong service tests over many tests written only to satisfy a line counter.
+- New code should include tests for non-obvious logic; do not add tests solely to bump coverage on unchanged files.
 
 ### Required test files
 
@@ -29,7 +40,7 @@ Every `lib/**/*.ts` and `features/**/*.ts` module must have a sibling `*.test.ts
 | Path | Reason |
 |------|--------|
 | `lib/env.ts` | Thin server-only wrapper (smoke-tested in `lib/env.test.ts`) |
-| `lib/db/index.ts` | Database client singleton |
+| `db/index.ts` | Database client singleton |
 
 ### Out of scope
 
@@ -38,14 +49,14 @@ These are intentionally excluded from coverage gates:
 | Path | Reason |
 |------|--------|
 | `lib/env.ts` | Thin server-only wrapper around `env-schema.ts` |
-| `lib/db/index.ts` | Database client singleton; covered by integration/health checks |
+| `db/index.ts` | Database client singleton; covered by integration/health checks |
 | `app/**` | Thin route files; route handlers may have focused tests (e.g. `/api/health`) |
 | `components/**` | Presentational UI and shadcn wrappers |
 | Config files | `next.config.ts`, `drizzle.config.ts`, etc. |
 
 ### What to test
 
-- Pure functions and validation (`lib/env-schema.ts`, `lib/db/health.ts`, feature services)
+- Pure functions and validation (`lib/env-schema.ts`, `db/health.ts`, feature services)
 - Branches and error paths
 - Real behavior, not implementation trivia
 - API route handlers when they encode security or response contracts

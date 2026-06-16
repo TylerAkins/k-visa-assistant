@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { checkDatabaseConnection } from "@/lib/db/health";
+import { checkDatabaseConnection } from "@/db/health";
 
 describe("checkDatabaseConnection", () => {
   it("returns true when the database query succeeds", async () => {

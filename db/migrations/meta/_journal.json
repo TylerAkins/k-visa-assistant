@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1781570974477,
+      "tag": "0000_keen_nebula",
+      "breakpoints": true
+    }
+  ]
 }

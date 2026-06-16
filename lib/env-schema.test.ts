@@ -9,21 +9,31 @@ import {
   parseEnvConfig,
 } from "@/lib/env-schema";
 
-const localConfig = {
+const localEnvInput = {
   APP_ENV: "local",
   NODE_ENV: "development",
   APP_URL: "http://localhost:3000",
   DATABASE_URL: "postgresql://kvisaassistant:kvisaassistant@127.0.0.1:5432/kvisaassistant",
+  SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+  ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
+  EMAIL_PROVIDER: "console",
+};
+
+const localConfig = {
+  ...localEnvInput,
+  DEV_ALLOWED_CIDRS: undefined,
+  TRUST_PROXY_HEADERS: false,
+  TRUSTED_PROXY_CIDRS: undefined,
 };
 
 describe("envSchema", () => {
   it("accepts a valid local configuration", () => {
-    expect(envSchema.safeParse(localConfig).success).toBe(true);
+    expect(envSchema.safeParse(localEnvInput).success).toBe(true);
   });
 
   it("requires NODE_ENV production for dev and prod APP_ENV", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       APP_ENV: "dev",
       NODE_ENV: "development",
     });
@@ -33,7 +43,7 @@ describe("envSchema", () => {
 
   it("rejects DEV_ALLOWED_CIDRS outside dev", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       DEV_ALLOWED_CIDRS: "203.0.113.0/24",
     });
 
@@ -46,6 +56,8 @@ describe("envSchema", () => {
       NODE_ENV: "production",
       APP_URL: "https://dev.example.com",
       DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+      SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+      ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
       DEV_ALLOWED_CIDRS: "203.0.113.0/24",
     });
 
@@ -58,6 +70,8 @@ describe("envSchema", () => {
       NODE_ENV: "production",
       APP_URL: "https://dev.example.com",
       DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+      SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+      ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
       DEV_ALLOWED_CIDRS: "not-a-cidr",
     });
 
@@ -70,6 +84,8 @@ describe("envSchema", () => {
       NODE_ENV: "production",
       APP_URL: "https://dev.example.com",
       DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+      SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+      ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
       DEV_ALLOWED_CIDRS: "0.0.0.0/0",
     });
 
@@ -82,9 +98,25 @@ describe("envSchema", () => {
       NODE_ENV: "production",
       APP_URL: "https://app.example.com",
       DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+      SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+      ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
+      REDIS_URL: "redis://127.0.0.1:6379",
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("requires REDIS_URL for prod", () => {
+    const result = envSchema.safeParse({
+      APP_ENV: "prod",
+      NODE_ENV: "production",
+      APP_URL: "https://app.example.com",
+      DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+      SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+      ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("rejects missing required fields", () => {
@@ -97,7 +129,7 @@ describe("envSchema", () => {
 
   it("rejects non-postgres DATABASE_URL values", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       DATABASE_URL: "mysql://user:pass@127.0.0.1:3306/kvisaassistant",
     });
 
@@ -106,8 +138,17 @@ describe("envSchema", () => {
 
   it("rejects malformed DATABASE_URL values", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       DATABASE_URL: "not-a-database-url",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects secrets shorter than 32 characters", () => {
+    const result = envSchema.safeParse({
+      ...localEnvInput,
+      SESSION_SECRET: "too-short",
     });
 
     expect(result.success).toBe(false);
@@ -125,13 +166,15 @@ describe("formatEnvErrors", () => {
       throw new Error("expected validation to fail");
     }
 
-    expect(formatEnvErrors(result.error)).toBe("APP_URL, DATABASE_URL");
+    expect(formatEnvErrors(result.error)).toBe(
+      "APP_URL, DATABASE_URL, ENCRYPTION_KEY, SESSION_SECRET",
+    );
   });
 });
 
 describe("parseEnvConfig", () => {
   it("returns parsed config when validation succeeds", () => {
-    expect(parseEnvConfig(localConfig)).toEqual(localConfig);
+    expect(parseEnvConfig(localEnvInput)).toEqual(localConfig);
   });
 
   it("throws with field names only when validation fails", () => {
@@ -141,6 +184,8 @@ describe("parseEnvConfig", () => {
         NODE_ENV: "development",
         APP_URL: "https://app.example.com",
         DATABASE_URL: "postgresql://user:pass@db.example.com:5432/kvisaassistant",
+        SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+        ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
       }),
     ).toThrow("Missing or invalid environment variables: NODE_ENV");
   });
