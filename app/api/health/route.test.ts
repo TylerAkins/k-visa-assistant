@@ -9,11 +9,11 @@ const { checkDatabaseConnectionMock, envMock, checkRateLimitMock } =
 
 vi.mock("server-only", () => ({}));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/db", () => ({
   db: {},
 }));
 
-vi.mock("@/lib/db/health", () => ({
+vi.mock("@/db/health", () => ({
   checkDatabaseConnection: checkDatabaseConnectionMock,
 }));
 

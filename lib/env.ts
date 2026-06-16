@@ -14,6 +14,9 @@ export const env: Env = parseEnvConfig({
   NODE_ENV: process.env.NODE_ENV,
   APP_URL: process.env.APP_URL,
   DATABASE_URL: process.env.DATABASE_URL,
+  SESSION_SECRET: process.env.SESSION_SECRET,
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+  EMAIL_PROVIDER: process.env.EMAIL_PROVIDER,
   DEV_ALLOWED_CIDRS: process.env.DEV_ALLOWED_CIDRS,
 });
 

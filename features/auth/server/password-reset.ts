@@ -1,0 +1,28 @@
+"use server";
+
+import { getRequestClientIp } from "@/lib/security/client-ip";
+import {
+  requestPasswordResetService,
+  resetPasswordService,
+} from "@/features/auth/services/password-reset";
+import type { ActionResult } from "@/features/auth/types";
+
+function formDataToRecord(formData: FormData) {
+  return Object.fromEntries(formData.entries());
+}
+
+export async function requestPasswordReset(
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const clientIp = await getRequestClientIp({ trustProxy: false });
+  return requestPasswordResetService(formDataToRecord(formData), clientIp);
+}
+
+export async function resetPassword(
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const clientIp = await getRequestClientIp({ trustProxy: false });
+  return resetPasswordService(formDataToRecord(formData), clientIp);
+}

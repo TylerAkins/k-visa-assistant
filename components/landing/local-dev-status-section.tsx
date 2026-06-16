@@ -1,5 +1,5 @@
-import { db } from "@/lib/db";
-import { checkDatabaseConnection } from "@/lib/db/health";
+import { db } from "@/db";
+import { checkDatabaseConnection } from "@/db/health";
 import { env } from "@/lib/env";
 import { isLocalEnv } from "@/lib/env-schema";
 import { LocalDevStatus } from "@/components/landing/local-dev-status";

@@ -1,13 +1,15 @@
-import type { ReactNode } from "react";
+import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
 import { SiteLogo } from "@/components/layout/site-logo";
+import { Button } from "@/components/ui/button";
+import type { SessionUser } from "@/features/auth/types";
 
 type AppShellProps = {
-  children: ReactNode;
+  children: React.ReactNode;
+  user?: SessionUser | null;
 };
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, user = null }: AppShellProps) {
   return (
     <div className="flex min-h-full flex-col bg-background">
       <header className="border-b border-border bg-panel">
@@ -27,16 +29,36 @@ export function AppShell({ children }: AppShellProps) {
             >
               Dashboard
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled
-              className="text-muted-foreground"
-              title="Available after Phase 1"
-            >
-              Sign in
-            </Button>
+            {user ? (
+              <Link href="/account/settings">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                >
+                  Account
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                  >
+                    Sign in
+                  </Button>
+                </Link>
+                <Link href="/register">
+                  <Button type="button" size="sm">
+                    Create account
+                  </Button>
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </header>

@@ -8,18 +8,19 @@ const baseEnv = {
   APP_URL: "http://localhost:3000",
   DATABASE_URL:
     "postgresql://kvisaassistant:kvisaassistant@127.0.0.1:5432/kvisaassistant",
+  SESSION_SECRET: "test-session-secret-at-least-32-characters-long",
+  ENCRYPTION_KEY: "test-encryption-key-at-least-32-characters-long",
+  EMAIL_PROVIDER: "console",
 } as const;
 
 function stubBaseEnv() {
-  vi.stubEnv("APP_ENV", baseEnv.APP_ENV);
-  vi.stubEnv("NODE_ENV", baseEnv.NODE_ENV);
-  vi.stubEnv("APP_URL", baseEnv.APP_URL);
-  vi.stubEnv("DATABASE_URL", baseEnv.DATABASE_URL);
-  vi.unstubAllEnvs();
-  vi.stubEnv("APP_ENV", baseEnv.APP_ENV);
-  vi.stubEnv("NODE_ENV", baseEnv.NODE_ENV);
-  vi.stubEnv("APP_URL", baseEnv.APP_URL);
-  vi.stubEnv("DATABASE_URL", baseEnv.DATABASE_URL);
+  process.env.APP_ENV = baseEnv.APP_ENV;
+  process.env.NODE_ENV = baseEnv.NODE_ENV;
+  process.env.APP_URL = baseEnv.APP_URL;
+  process.env.DATABASE_URL = baseEnv.DATABASE_URL;
+  process.env.SESSION_SECRET = baseEnv.SESSION_SECRET;
+  process.env.ENCRYPTION_KEY = baseEnv.ENCRYPTION_KEY;
+  process.env.EMAIL_PROVIDER = baseEnv.EMAIL_PROVIDER;
   delete process.env.DEV_ALLOWED_CIDRS;
 }
 
@@ -44,14 +45,14 @@ describe("lib/env", () => {
   });
 
   it("warns when DEV_ALLOWED_CIDRS is set in dev before enforcement exists", async () => {
-    vi.stubEnv("APP_ENV", "dev");
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("APP_URL", "https://dev.example.com");
-    vi.stubEnv(
-      "DATABASE_URL",
-      "postgresql://user:pass@db.example.com:5432/kvisaassistant",
-    );
-    vi.stubEnv("DEV_ALLOWED_CIDRS", "203.0.113.0/24");
+    process.env.APP_ENV = "dev";
+    process.env.NODE_ENV = "production";
+    process.env.APP_URL = "https://dev.example.com";
+    process.env.DATABASE_URL =
+      "postgresql://user:pass@db.example.com:5432/kvisaassistant";
+    process.env.SESSION_SECRET = baseEnv.SESSION_SECRET;
+    process.env.ENCRYPTION_KEY = baseEnv.ENCRYPTION_KEY;
+    process.env.DEV_ALLOWED_CIDRS = "203.0.113.0/24";
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -65,13 +66,12 @@ describe("lib/env", () => {
   });
 
   it("warns when APP_ENV is local with production NODE_ENV", async () => {
-    vi.stubEnv("APP_ENV", "local");
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("APP_URL", "http://localhost:3000");
-    vi.stubEnv(
-      "DATABASE_URL",
-      "postgresql://kvisaassistant:kvisaassistant@127.0.0.1:5432/kvisaassistant",
-    );
+    process.env.APP_ENV = "local";
+    process.env.NODE_ENV = "production";
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.DATABASE_URL = baseEnv.DATABASE_URL;
+    process.env.SESSION_SECRET = baseEnv.SESSION_SECRET;
+    process.env.ENCRYPTION_KEY = baseEnv.ENCRYPTION_KEY;
 
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 

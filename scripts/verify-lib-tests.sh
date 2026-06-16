@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXCLUDED=(
   "${ROOT_DIR}/lib/env.ts"
-  "${ROOT_DIR}/lib/db/index.ts"
+  "${ROOT_DIR}/db/index.ts"
 )
 
 should_exclude() {

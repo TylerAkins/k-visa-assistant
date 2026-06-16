@@ -1,0 +1,126 @@
+# Authentication (Phase 1)
+
+Phase 1 adds custom authentication with Argon2id passwords, database-backed sessions, email verification, password reset, optional TOTP, and recovery codes.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Pages[app pages] --> Components[features/auth/components]
+  Components --> Actions[features/auth/server]
+  Actions --> LibAuth[lib/auth]
+  Actions --> LibEmail[lib/email]
+  LibAuth --> DB[(PostgreSQL)]
+  Actions --> DB
+```
+
+- **Pages** (`app/(auth)`, `app/(protected)`, `app/verify-email`) are thin RSC wrappers.
+- **Server Actions** in `features/auth/server/` handle validation, rate limiting, and orchestration.
+- **Crypto and session primitives** live in `lib/auth/`.
+- **Email** is sent through the `EmailProvider` interface (`lib/email/`).
+
+## Database tables
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Account record (`email`, `passwordHash`, `emailVerified`) |
+| `sessions` | Active login sessions (`userId`, `expiresAt`) |
+| `pending_logins` | Server-side TOTP challenge state during login |
+| `email_verification_tokens` | Hashed single-use email verification tokens |
+| `password_reset_tokens` | Hashed single-use password reset tokens |
+| `totp_settings` | Encrypted TOTP secret (`secretEncrypted`, `enabled`) |
+| `recovery_codes` | Argon2id-hashed single-use recovery codes |
+
+All child tables use `ON DELETE CASCADE` from `users`.
+
+## Session flow
+
+1. User submits valid credentials.
+2. If TOTP is disabled: `rotateSession()` creates a new session row, sets HTTP-only cookie.
+3. If TOTP is enabled: a `pending_logins` row is created; cookie holds only the pending login ID.
+4. After TOTP/recovery code verification: session is rotated, pending row deleted.
+5. `getSession()` validates expiry on every authoritative check.
+6. Logout deletes the session row and clears cookies.
+
+Cookie attributes:
+
+- `httpOnly`, `sameSite=lax`, `path=/`
+- `secure` when `APP_ENV !== local`
+- `__Host-` prefix in non-local environments
+
+## Email verification
+
+1. Register or resend creates a random token; only SHA-256 hash stored in DB.
+2. Email contains link to `/verify-email?token=...`.
+3. Client page POSTs token via Server Action (no GET mutation).
+4. On success: `emailVerified = true`, token row deleted.
+
+## Password reset
+
+1. Request always returns a generic success message.
+2. Prior reset tokens for the user are deleted before issuing a new one.
+3. Reset link POSTs token + new password.
+4. On success: password updated, token deleted, all sessions invalidated.
+
+## TOTP flow
+
+**Enrollment**
+
+1. `beginTotpSetup` stores encrypted secret with `enabled = false`.
+2. User scans QR code and submits first TOTP code.
+3. `confirmTotpSetup` verifies code, sets `enabled = true`, generates 10 recovery codes (shown once).
+
+**Login**
+
+1. Password step creates `pending_logins` row.
+2. User submits TOTP or recovery code.
+3. Max 5 attempts per pending login; then forced full re-login.
+
+**Disable / regen**
+
+- Disable requires password + TOTP or recovery code.
+- Recovery code regeneration requires valid TOTP and replaces all unused codes in a transaction.
+
+TOTP verification uses a ±1 step window (30 seconds).
+
+## Rate limiting
+
+In-memory per-process limits in `lib/security/auth-rate-limit.ts`:
+
+- Login: IP + email (10 / 15 min)
+- TOTP: pending ID + IP + user (5 / 5 min)
+- Signup, reset, verify, resend, TOTP setup/disable, recovery regen: dedicated presets
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `SESSION_SECRET` | Session-related signing (min 32 chars) |
+| `ENCRYPTION_KEY` | TOTP secret encryption at rest (min 32 chars) |
+| `EMAIL_PROVIDER` | `console` (default) or future providers |
+
+## Security decisions
+
+- Argon2id with pinned params (64 MB, 3 iterations, parallelism 1)
+- Dummy hash verification when user not found (timing-safe login)
+- Uniform login error message
+- Email normalization (lowercase + trim)
+- Session rotation on every login
+- SHA-256 hashed tokens at rest with constant-time compare
+- Separate `ENCRYPTION_KEY` for TOTP secrets
+- Server-side `pending_logins` for TOTP challenge
+- `getSession()` required in all mutating authenticated actions
+
+## Known Phase 1 limitations
+
+- Rate limiting is in-memory (resets on deploy; not multi-instance)
+- No Content-Security-Policy yet (Phase 9)
+- No permanent account lockout beyond rate limits
+- No logged-in password change flow
+- Console email provider logs full body only in `APP_ENV=local`
+
+## Future extension points
+
+- `ResendProvider` implementing `EmailProvider`
+- Redis-backed rate limiting for horizontal scale
+- Background job for expired session/token purge

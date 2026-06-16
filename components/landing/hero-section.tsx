@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -26,11 +28,16 @@ export function HeroSection() {
           no guesswork.
         </p>
         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:gap-4">
-          <Button disabled size="lg" className="sm:min-w-36">
-            Create account
-          </Button>
+          <Link href="/register">
+            <Button type="button" size="lg" className="sm:min-w-36">
+              Create account
+            </Button>
+          </Link>
           <p className="text-sm text-muted-foreground">
-            Sign-up and sign-in arrive in Phase 1.
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline">
+              Sign in
+            </Link>
           </p>
         </div>
       </div>

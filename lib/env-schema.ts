@@ -14,6 +14,13 @@ function isPostgresDatabaseUrl(value: string): boolean {
 export const appEnvironments = ["local", "dev", "prod"] as const;
 export type AppEnvironment = (typeof appEnvironments)[number];
 
+export const emailProviders = ["console"] as const;
+export type EmailProviderName = (typeof emailProviders)[number];
+
+const secretSchema = z
+  .string()
+  .min(32, "Secret must be at least 32 characters");
+
 export const envSchema = z
   .object({
     APP_ENV: z.enum(appEnvironments),
@@ -25,6 +32,9 @@ export const envSchema = z
       .refine(isPostgresDatabaseUrl, {
         message: "DATABASE_URL must be a postgresql:// or postgres:// URL",
       }),
+    SESSION_SECRET: secretSchema,
+    ENCRYPTION_KEY: secretSchema,
+    EMAIL_PROVIDER: z.enum(emailProviders).default("console"),
     DEV_ALLOWED_CIDRS: z.string().optional(),
   })
   .superRefine((data, context) => {
@@ -81,6 +91,9 @@ export function parseEnvConfig(
     NODE_ENV: config.NODE_ENV,
     APP_URL: config.APP_URL,
     DATABASE_URL: config.DATABASE_URL,
+    SESSION_SECRET: config.SESSION_SECRET,
+    ENCRYPTION_KEY: config.ENCRYPTION_KEY,
+    EMAIL_PROVIDER: config.EMAIL_PROVIDER,
     DEV_ALLOWED_CIDRS: config.DEV_ALLOWED_CIDRS,
   });
 
