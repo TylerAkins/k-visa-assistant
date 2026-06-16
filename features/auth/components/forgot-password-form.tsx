@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { FormMessage } from "@/features/auth/components/form-message";
 import { requestPasswordReset } from "@/features/auth/server/password-reset";
 import type { ActionResult } from "@/features/auth/types";
+import { cn } from "@/lib/utils";
 
 const initialState: ActionResult = { success: false };
 
@@ -35,9 +36,12 @@ export function ForgotPasswordForm() {
             Open the link in the email to choose a new password. The link
             expires after one hour.
           </p>
-          <Button asChild className="w-full">
-            <Link href="/login">Back to sign in</Link>
-          </Button>
+          <Link
+            href="/login"
+            className={cn(buttonVariants({ variant: "default" }), "w-full")}
+          >
+            Back to sign in
+          </Link>
         </div>
       </AuthCard>
     );

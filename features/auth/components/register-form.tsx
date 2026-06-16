@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthCard } from "@/features/auth/components/auth-card";
@@ -11,6 +11,7 @@ import { FormMessage } from "@/features/auth/components/form-message";
 import { PasswordRequirements } from "@/features/auth/components/password-requirements";
 import { registerUser } from "@/features/auth/server/register";
 import type { ActionResult } from "@/features/auth/types";
+import { cn } from "@/lib/utils";
 
 const initialState: ActionResult = { success: false };
 
@@ -38,9 +39,12 @@ export function RegisterForm() {
             The message can take a minute to arrive. Check spam if you do not
             see it.
           </p>
-          <Button asChild className="w-full">
-            <Link href="/login">Go to sign in</Link>
-          </Button>
+          <Link
+            href="/login"
+            className={cn(buttonVariants({ variant: "default" }), "w-full")}
+          >
+            Go to sign in
+          </Link>
         </div>
       </AuthCard>
     );
