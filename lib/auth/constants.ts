@@ -13,6 +13,10 @@ export const RECOVERY_CODE_COUNT = 10;
 
 export const LOGIN_INVALID_MESSAGE = "Invalid email or password.";
 export const TOTP_INVALID_MESSAGE = "Invalid code.";
-export const GENERIC_EMAIL_MESSAGE =
-  "If an account exists, we sent an email.";
+export const REGISTRATION_EMAIL_MESSAGE =
+  "Check your email for a verification link to finish creating your account.";
+export const PASSWORD_RESET_EMAIL_MESSAGE =
+  "If that email is registered, you will receive a password reset link shortly.";
+export const VERIFICATION_RESEND_MESSAGE =
+  "Verification email sent. Check your inbox.";
 export const UNAUTHORIZED_MESSAGE = "You must be signed in.";

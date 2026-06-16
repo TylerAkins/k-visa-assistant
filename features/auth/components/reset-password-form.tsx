@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { FormMessage } from "@/features/auth/components/form-message";
+import { PasswordRequirements } from "@/features/auth/components/password-requirements";
 import { resetPassword } from "@/features/auth/server/password-reset";
 import type { ActionResult } from "@/features/auth/types";
 
@@ -41,8 +42,10 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             name="password"
             type="password"
             autoComplete="new-password"
+            aria-describedby="reset-password-requirements"
             required
           />
+          <PasswordRequirements id="reset-password-requirements" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm new password</Label>

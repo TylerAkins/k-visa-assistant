@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthCard } from "@/features/auth/components/auth-card";
 import { FormMessage } from "@/features/auth/components/form-message";
+import { PasswordRequirements } from "@/features/auth/components/password-requirements";
 import { registerUser } from "@/features/auth/server/register";
 import type { ActionResult } from "@/features/auth/types";
 
@@ -21,10 +22,12 @@ export function RegisterForm() {
       title="Create account"
       description="Start your K-1 visa workflow with a secure account."
     >
-      <FormMessage
-        message={state.success ? state.error : state.error}
-        variant={state.success ? "success" : "error"}
-      />
+      {state.success || state.error ? (
+        <FormMessage
+          message={state.error}
+          variant={state.success ? "success" : "error"}
+        />
+      ) : null}
       {state.fieldErrors?.email ? (
         <FormMessage message={state.fieldErrors.email[0]} />
       ) : null}
@@ -52,8 +55,10 @@ export function RegisterForm() {
             name="password"
             type="password"
             autoComplete="new-password"
+            aria-describedby="register-password-requirements"
             required
           />
+          <PasswordRequirements id="register-password-requirements" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm password</Label>

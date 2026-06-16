@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { passwordResetTokens, users } from "@/db/schema";
-import { GENERIC_EMAIL_MESSAGE } from "@/lib/auth/constants";
+import { PASSWORD_RESET_EMAIL_MESSAGE } from "@/lib/auth/constants";
 import { hashPassword } from "@/lib/auth/password";
 import { deleteUserSessions } from "@/lib/auth/session";
 import { hashToken, safeCompare } from "@/lib/auth/tokens";
@@ -58,7 +58,7 @@ export async function requestPasswordResetService(
     });
   }
 
-  return { success: true, error: GENERIC_EMAIL_MESSAGE };
+  return { success: true, error: PASSWORD_RESET_EMAIL_MESSAGE };
 }
 
 export async function resetPasswordService(

@@ -3,7 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 
 import { users } from "@/db/schema";
-import { GENERIC_EMAIL_MESSAGE } from "@/lib/auth/constants";
+import { REGISTRATION_EMAIL_MESSAGE } from "@/lib/auth/constants";
 import { hashPassword } from "@/lib/auth/password";
 import { getEmailProvider } from "@/lib/email";
 import { env } from "@/lib/env";
@@ -68,6 +68,6 @@ export async function registerUserService(
 
   return {
     success: true,
-    error: GENERIC_EMAIL_MESSAGE,
+    error: REGISTRATION_EMAIL_MESSAGE,
   };
 }

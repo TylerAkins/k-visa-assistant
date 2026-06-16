@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { emailVerificationTokens, users } from "@/db/schema";
-import { GENERIC_EMAIL_MESSAGE } from "@/lib/auth/constants";
+import { VERIFICATION_RESEND_MESSAGE } from "@/lib/auth/constants";
 import { getAuthSession } from "@/lib/auth/get-auth-session";
 import { hashToken, safeCompare } from "@/lib/auth/tokens";
 import { getEmailProvider } from "@/lib/email";
@@ -93,5 +93,5 @@ export async function resendVerificationEmailService(
     text: `Verify your email by visiting: ${verifyUrl}`,
   });
 
-  return { success: true, error: GENERIC_EMAIL_MESSAGE };
+  return { success: true, error: VERIFICATION_RESEND_MESSAGE };
 }
