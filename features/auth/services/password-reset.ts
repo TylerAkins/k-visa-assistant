@@ -4,7 +4,11 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { passwordResetTokens, users } from "@/db/schema";
-import { PASSWORD_RESET_EMAIL_MESSAGE } from "@/lib/auth/constants";
+import {
+  EMAIL_DELIVERY_FAILED_MESSAGE,
+  PASSWORD_RESET_EMAIL_MESSAGE,
+} from "@/lib/auth/constants";
+import { deletePendingLoginsForUser } from "@/lib/auth/pending-login";
 import { hashPassword } from "@/lib/auth/password";
 import { deleteUserSessions } from "@/lib/auth/session";
 import { hashToken, safeCompare } from "@/lib/auth/tokens";
@@ -24,6 +28,8 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "@/features/auth/validation/schemas";
+
+const TIMING_MITIGATION_PASSWORD = "TimingMitigation!Aa1";
 
 export async function requestPasswordResetService(
   input: Record<string, FormDataEntryValue | null>,
@@ -48,14 +54,20 @@ export async function requestPasswordResetService(
   const user = await findUserByEmail(parsed.data.email);
 
   if (user) {
-    const token = await createPasswordResetToken(user.id);
-    const resetUrl = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+    try {
+      const token = await createPasswordResetToken(user.id);
+      const resetUrl = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
 
-    await getEmailProvider().send({
-      to: user.email,
-      subject: "Reset your KVisaAssistant password",
-      text: `Reset your password by visiting: ${resetUrl}`,
-    });
+      await getEmailProvider().send({
+        to: user.email,
+        subject: "Reset your KVisaAssistant password",
+        text: `Reset your password by visiting: ${resetUrl}`,
+      });
+    } catch {
+      return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
+    }
+  } else {
+    await hashPassword(TIMING_MITIGATION_PASSWORD);
   }
 
   return { success: true, error: PASSWORD_RESET_EMAIL_MESSAGE };
@@ -108,6 +120,7 @@ export async function resetPasswordService(
   });
 
   await deleteUserSessions(tokenRow.userId);
+  await deletePendingLoginsForUser(tokenRow.userId);
 
   return {
     success: true,

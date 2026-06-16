@@ -1,6 +1,6 @@
 "use server";
 
-import { getRequestClientIp } from "@/lib/security/client-ip";
+import { getAuthClientIp } from "@/lib/security/auth-client-ip";
 import {
   requestPasswordResetService,
   resetPasswordService,
@@ -15,7 +15,7 @@ export async function requestPasswordReset(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   return requestPasswordResetService(formDataToRecord(formData), clientIp);
 }
 
@@ -23,6 +23,6 @@ export async function resetPassword(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   return resetPasswordService(formDataToRecord(formData), clientIp);
 }

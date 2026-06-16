@@ -31,10 +31,20 @@ import {
   totpCodeSchema,
 } from "@/features/auth/validation/schemas";
 
-export async function beginTotpSetupService(): Promise<TotpSetupResult> {
+export async function beginTotpSetupService(
+  clientIp: string,
+): Promise<TotpSetupResult> {
   const authSession = await getAuthSession();
   if (!authSession) {
     return unauthorizedResult();
+  }
+
+  const rateLimit = checkAuthRateLimits("totp-setup", [
+    `ip:${clientIp}`,
+    `user:${authSession.user.id}`,
+  ]);
+  if (!rateLimit.allowed) {
+    return rateLimitError(rateLimit.retryAfterSeconds);
   }
 
   const [existing] = await db

@@ -1,6 +1,6 @@
 "use server";
 
-import { getRequestClientIp } from "@/lib/security/client-ip";
+import { getAuthClientIp } from "@/lib/security/auth-client-ip";
 import {
   beginTotpSetupService,
   confirmTotpSetupService,
@@ -15,14 +15,15 @@ function formDataToRecord(formData: FormData) {
 }
 
 export async function beginTotpSetup(): Promise<TotpSetupResult> {
-  return beginTotpSetupService();
+  const clientIp = await getAuthClientIp();
+  return beginTotpSetupService(clientIp);
 }
 
 export async function confirmTotpSetup(
   _prevState: TotpSetupResult,
   formData: FormData,
 ): Promise<TotpSetupResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   return confirmTotpSetupService(formDataToRecord(formData), clientIp);
 }
 
@@ -30,7 +31,7 @@ export async function disableTotp(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   return disableTotpService(formDataToRecord(formData), clientIp);
 }
 
@@ -38,7 +39,7 @@ export async function regenerateRecoveryCodes(
   _prevState: TotpSetupResult,
   formData: FormData,
 ): Promise<TotpSetupResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   return regenerateRecoveryCodesService(formDataToRecord(formData), clientIp);
 }
 

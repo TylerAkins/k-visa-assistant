@@ -44,11 +44,11 @@ describe("totp", () => {
   it("generates recovery codes", () => {
     const codes = generateRecoveryCodes();
     expect(codes).toHaveLength(10);
-    expect(codes[0]).toMatch(/^[0-9a-f]{4}-[0-9a-f]{4}$/);
+    expect(codes[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{8}$/);
   });
 
   it("hashes and verifies recovery codes", async () => {
-    const code = "abcd-ef01";
+    const code = "a1b2c3d4-e5f67890";
     const codeHash = await hashRecoveryCode(code);
     expect(await verifyRecoveryCode(codeHash, code)).toBe(true);
     expect(await verifyRecoveryCode(codeHash, "wrong")).toBe(false);

@@ -15,7 +15,22 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("@/lib/env", () => ({
-  env: { APP_ENV: "local" },
+  env: {
+    APP_ENV: "local",
+    SESSION_SECRET: "test-session-secret-at-least-32-characters",
+  },
+}));
+
+vi.mock("@/lib/auth/session-cookie", () => ({
+  signSessionCookieValue: vi.fn().mockImplementation(async (sessionId: string) => {
+    return `signed.${sessionId}.sig`;
+  }),
+  parseSessionCookieValue: vi.fn().mockImplementation(async (value: string) => {
+    if (value.startsWith("signed.")) {
+      return value.split(".")[1] ?? null;
+    }
+    return null;
+  }),
 }));
 
 import {
@@ -36,7 +51,7 @@ describe("cookies", () => {
   it("reads session and pending ids from cookies", async () => {
     cookieStore.get.mockImplementation((name: string) => {
       if (name === "session") {
-        return { value: "session-123" };
+        return { value: "signed.session-123.sig" };
       }
       if (name === "pending-login") {
         return { value: "pending-123" };
@@ -52,7 +67,7 @@ describe("cookies", () => {
     await setSessionCookie("session-456");
     expect(cookieStore.set).toHaveBeenCalledWith(
       "session",
-      "session-456",
+      "signed.session-456.sig",
       expect.objectContaining({ httpOnly: true, secure: false }),
     );
 
@@ -81,10 +96,10 @@ describe("cookies", () => {
   it("prefers local session cookie over host cookie", async () => {
     cookieStore.get.mockImplementation((name: string) => {
       if (name === "session") {
-        return { value: "local-session" };
+        return { value: "signed.local-session.sig" };
       }
       if (name === "__Host-session") {
-        return { value: "host-session" };
+        return { value: "signed.host-session.sig" };
       }
       return undefined;
     });
@@ -95,7 +110,7 @@ describe("cookies", () => {
   it("reads host-prefixed session cookies", async () => {
     cookieStore.get.mockImplementation((name: string) => {
       if (name === "__Host-session") {
-        return { value: "host-session-123" };
+        return { value: "signed.host-session-123.sig" };
       }
       return undefined;
     });
@@ -132,7 +147,7 @@ describe("cookies", () => {
     await setProdSessionCookie("session-prod");
     expect(cookieStore.set).toHaveBeenCalledWith(
       "__Host-session",
-      "session-prod",
+      "signed.session-prod.sig",
       expect.objectContaining({ secure: true }),
     );
   });

@@ -28,6 +28,10 @@ vi.mock("@/lib/auth/session", () => ({
   deleteUserSessions: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/pending-login", () => ({
+  deletePendingLoginsForUser: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/features/auth/services/user-repository", () => ({
   findUserByEmail: vi.fn(),
   createPasswordResetToken: vi.fn().mockResolvedValue("reset-token"),

@@ -64,11 +64,26 @@ describe("checkRateLimit", () => {
   });
 
   it("caps the number of tracked buckets", () => {
+    const now = Date.now();
     for (let index = 0; index < 10_001; index += 1) {
-      checkRateLimit(`health:${index}`, 100, 60_000, 1_000);
+      checkRateLimit(`health:${index}`, 100, 60_000, now);
     }
 
     expect(getRateLimitBucketCountForTests()).toBe(10_000);
+  });
+
+  it("prefers evicting non-auth buckets when over max", () => {
+    const now = Date.now();
+    for (let index = 0; index < 5_001; index += 1) {
+      checkRateLimit(`health:${index}`, 100, 60_000, now);
+      checkRateLimit(`auth:login:ip:${index}`, 100, 60_000, now);
+    }
+
+    expect(getRateLimitBucketCountForTests()).toBe(10_000);
+    checkRateLimit("health:overflow", 1, 60_000, now);
+    expect(
+      checkRateLimit("auth:login:ip:0", 100, 60_000, now).allowed,
+    ).toBe(true);
   });
 
   it("purges short-window buckets without waiting for long-window cadence", () => {

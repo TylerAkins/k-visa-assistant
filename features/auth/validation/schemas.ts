@@ -48,7 +48,12 @@ export const totpCodeSchema = z.object({
 });
 
 export const recoveryCodeSchema = z.object({
-  code: z.string().regex(/^[0-9a-f]{4}-[0-9a-f]{4}$/i, "Enter a valid recovery code"),
+  code: z
+    .string()
+    .regex(
+      /^[0-9a-f]{8}-[0-9a-f]{8}$/i,
+      "Enter a valid recovery code (format: xxxxxxxx-xxxxxxxx)",
+    ),
 });
 
 export const disableTotpSchema = z.object({

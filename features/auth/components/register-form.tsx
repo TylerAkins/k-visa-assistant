@@ -21,24 +21,38 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
 
   if (state.success) {
+    const emailWasSent = state.verificationEmailSent !== false;
+
     return (
       <AuthCard
-        title="Check your email"
+        title={emailWasSent ? "Check your email" : "Account may already exist"}
         description={
-          email
-            ? `We sent a verification link to ${email}.`
-            : "We sent a verification link to finish creating your account."
+          emailWasSent
+            ? email
+              ? `We sent a verification link to ${email}.`
+              : "We sent a verification link to finish creating your account."
+            : state.error ??
+              "If this email is not already registered, we sent a verification link."
         }
       >
         <div className="space-y-4 text-sm text-muted-foreground">
-          <p>
-            Open the link in that email to verify your account. Once verified,
-            sign in to continue setting up your case.
-          </p>
-          <p>
-            The message can take a minute to arrive. Check spam if you do not
-            see it.
-          </p>
+          {emailWasSent ? (
+            <>
+              <p>
+                Open the link in that email to verify your account. Once
+                verified, sign in to continue setting up your case.
+              </p>
+              <p>
+                The message can take a minute to arrive. Check spam if you do
+                not see it.
+              </p>
+            </>
+          ) : (
+            <p>
+              If you already have an account, sign in. Otherwise check your
+              inbox for a verification link.
+            </p>
+          )}
           <Link
             href="/login"
             className={cn(buttonVariants({ variant: "default" }), "w-full")}

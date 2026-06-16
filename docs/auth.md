@@ -8,14 +8,16 @@ Phase 1 adds custom authentication with Argon2id passwords, database-backed sess
 flowchart LR
   Pages[app pages] --> Components[features/auth/components]
   Components --> Actions[features/auth/server]
-  Actions --> LibAuth[lib/auth]
-  Actions --> LibEmail[lib/email]
+  Actions --> Services[features/auth/services]
+  Services --> LibAuth[lib/auth]
+  Services --> LibEmail[lib/email]
   LibAuth --> DB[(PostgreSQL)]
-  Actions --> DB
+  Services --> DB
 ```
 
 - **Pages** (`app/(auth)`, `app/(protected)`, `app/verify-email`) are thin RSC wrappers.
-- **Server Actions** in `features/auth/server/` handle validation, rate limiting, and orchestration.
+- **Server Actions** in `features/auth/server/` are thin wrappers (IP resolution, redirects).
+- **Business logic** lives in `features/auth/services/` (unit-tested).
 - **Crypto and session primitives** live in `lib/auth/`.
 - **Email** is sent through the `EmailProvider` interface (`lib/email/`).
 
@@ -35,8 +37,8 @@ All child tables use `ON DELETE CASCADE` from `users`.
 
 ## Session flow
 
-1. User submits valid credentials.
-2. If TOTP is disabled: `rotateSession()` creates a new session row, sets HTTP-only cookie.
+1. User submits valid credentials (email must be verified).
+2. If TOTP is disabled: `rotateSession()` creates a new session row, sets HTTP-only signed cookie.
 3. If TOTP is enabled: a `pending_logins` row is created; cookie holds only the pending login ID.
 4. After TOTP/recovery code verification: session is rotated, pending row deleted.
 5. `getSession()` validates expiry on every authoritative check.
@@ -47,6 +49,9 @@ Cookie attributes:
 - `httpOnly`, `sameSite=lax`, `path=/`
 - `secure` when `APP_ENV !== local`
 - `__Host-` prefix in non-local environments
+- Value is `sessionId.HMAC-SHA256` using `SESSION_SECRET` (middleware validates signature)
+
+Client IP for rate limits uses `X-Forwarded-For` / `X-Real-IP` in non-local environments (`getAuthClientIp`).
 
 ## Email verification
 
@@ -68,7 +73,7 @@ Cookie attributes:
 
 1. `beginTotpSetup` stores encrypted secret with `enabled = false`.
 2. User scans QR code and submits first TOTP code.
-3. `confirmTotpSetup` verifies code, sets `enabled = true`, generates 10 recovery codes (shown once).
+3. `confirmTotpSetup` verifies code, sets `enabled = true`, generates 10 recovery codes (64-bit hex each, shown once).
 
 **Login**
 
@@ -90,12 +95,13 @@ In-memory per-process limits in `lib/security/auth-rate-limit.ts`:
 - Login: IP + email (10 / 15 min)
 - TOTP: pending ID + IP + user (5 / 5 min)
 - Signup, reset, verify, resend, TOTP setup/disable, recovery regen: dedicated presets
+- Bucket eviction prefers non-`auth:` keys when the in-memory map is full
 
 ## Environment variables
 
 | Variable | Purpose |
 |----------|---------|
-| `SESSION_SECRET` | Session-related signing (min 32 chars) |
+| `SESSION_SECRET` | HMAC signing for session cookies (min 32 chars) |
 | `ENCRYPTION_KEY` | TOTP secret encryption at rest (min 32 chars) |
 | `EMAIL_PROVIDER` | `console` (default) or future providers |
 

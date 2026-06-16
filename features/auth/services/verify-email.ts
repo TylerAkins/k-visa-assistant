@@ -4,7 +4,10 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { emailVerificationTokens, users } from "@/db/schema";
-import { VERIFICATION_RESEND_MESSAGE } from "@/lib/auth/constants";
+import {
+  EMAIL_DELIVERY_FAILED_MESSAGE,
+  VERIFICATION_RESEND_MESSAGE,
+} from "@/lib/auth/constants";
 import { getAuthSession } from "@/lib/auth/get-auth-session";
 import { hashToken, safeCompare } from "@/lib/auth/tokens";
 import { getEmailProvider } from "@/lib/email";
@@ -43,7 +46,24 @@ export async function verifyEmailService(
     .where(eq(emailVerificationTokens.tokenHash, tokenHash))
     .limit(1);
 
-  if (!tokenRow || tokenRow.expiresAt <= new Date()) {
+  if (!tokenRow) {
+    return { success: false, error: "Invalid or expired verification link." };
+  }
+
+  const [user] = await db
+    .select({ emailVerified: users.emailVerified })
+    .from(users)
+    .where(eq(users.id, tokenRow.userId))
+    .limit(1);
+
+  if (user?.emailVerified) {
+    await db
+      .delete(emailVerificationTokens)
+      .where(eq(emailVerificationTokens.id, tokenRow.id));
+    return { success: true, error: "Email verified successfully." };
+  }
+
+  if (tokenRow.expiresAt <= new Date()) {
     return { success: false, error: "Invalid or expired verification link." };
   }
 
@@ -87,11 +107,15 @@ export async function resendVerificationEmailService(
   const token = await createEmailVerificationToken(authSession.user.id);
   const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
 
-  await getEmailProvider().send({
-    to: authSession.user.email,
-    subject: "Verify your KVisaAssistant email",
-    text: `Verify your email by visiting: ${verifyUrl}`,
-  });
+  try {
+    await getEmailProvider().send({
+      to: authSession.user.email,
+      subject: "Verify your KVisaAssistant email",
+      text: `Verify your email by visiting: ${verifyUrl}`,
+    });
+  } catch {
+    return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
+  }
 
   return { success: true, error: VERIFICATION_RESEND_MESSAGE };
 }

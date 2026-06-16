@@ -26,13 +26,34 @@ function enforceMaxBuckets(): void {
     return;
   }
 
-  const entries = [...buckets.entries()].sort(
-    (left, right) => left[1].windowStart - right[1].windowStart,
-  );
-  const overflow = buckets.size - MAX_BUCKETS;
+  const now = Date.now();
+  purgeExpiredBuckets(now);
 
-  for (const [key] of entries.slice(0, overflow)) {
-    buckets.delete(key);
+  if (buckets.size <= MAX_BUCKETS) {
+    return;
+  }
+
+  const evictOldest = (entries: Array<[string, RateLimitBucket]>) => {
+    const sorted = entries.sort(
+      (left, right) => left[1].windowStart - right[1].windowStart,
+    );
+    const overflow = buckets.size - MAX_BUCKETS;
+
+    for (const [key] of sorted.slice(0, overflow)) {
+      buckets.delete(key);
+    }
+  };
+
+  const nonAuthEntries = [...buckets.entries()].filter(
+    ([key]) => !key.startsWith("auth:"),
+  );
+
+  if (nonAuthEntries.length > 0) {
+    evictOldest(nonAuthEntries);
+  }
+
+  if (buckets.size > MAX_BUCKETS) {
+    evictOldest([...buckets.entries()]);
   }
 }
 

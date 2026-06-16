@@ -31,6 +31,7 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
   const [isPending, startTransition] = useTransition();
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const [beginTotpError, setBeginTotpError] = useState<string | null>(null);
   const [resendState, resendAction, resendPending] = useActionState(
     async (_prev: ActionResult) => resendVerificationEmail(),
     initialActionState,
@@ -50,9 +51,12 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
 
   const handleBeginTotp = () => {
     startTransition(async () => {
+      setBeginTotpError(null);
       const result = await beginTotpSetup();
       if (result.qrDataUrl) {
         setQrDataUrl(result.qrDataUrl);
+      } else if (result.error) {
+        setBeginTotpError(result.error);
       }
     });
   };
@@ -122,6 +126,7 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
 
           {!totpEnabled ? (
             <div className="mt-4 space-y-4">
+              <FormMessage message={beginTotpError ?? undefined} />
               {!qrDataUrl ? (
                 <Button
                   type="button"
@@ -139,6 +144,9 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
                     className="mx-auto size-48 rounded-lg border border-border bg-white p-2"
                   />
                   <FormMessage message={confirmState.error} />
+                  {confirmState.fieldErrors?.code ? (
+                    <FormMessage message={confirmState.fieldErrors.code[0]} />
+                  ) : null}
                   <form action={confirmAction} className="space-y-3">
                     <div className="space-y-2">
                       <Label htmlFor="totp-code">Verification code</Label>
@@ -160,6 +168,12 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
           ) : (
             <div className="mt-4 space-y-4">
               <FormMessage message={disableState.error} variant={disableState.success ? "success" : "error"} />
+              {disableState.fieldErrors?.password ? (
+                <FormMessage message={disableState.fieldErrors.password[0]} />
+              ) : null}
+              {disableState.fieldErrors?.code ? (
+                <FormMessage message={disableState.fieldErrors.code[0]} />
+              ) : null}
               <form action={disableAction} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="disable-password">Password</Label>
@@ -181,6 +195,9 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
               </form>
 
               <FormMessage message={regenState.error} />
+              {regenState.fieldErrors?.code ? (
+                <FormMessage message={regenState.fieldErrors.code[0]} />
+              ) : null}
               <form action={regenAction} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="regen-code">Authenticator code</Label>

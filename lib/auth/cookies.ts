@@ -9,13 +9,21 @@ import {
   getSessionCookieMaxAge,
   getSessionCookieName,
 } from "@/lib/auth/cookie-config";
+import {
+  parseSessionCookieValue,
+  signSessionCookieValue,
+} from "@/lib/auth/session-cookie";
 import { env } from "@/lib/env";
 
 export async function setSessionCookie(sessionId: string): Promise<void> {
   const cookieStore = await cookies();
+  const signedValue = await signSessionCookieValue(
+    sessionId,
+    env.SESSION_SECRET,
+  );
   cookieStore.set(
     getSessionCookieName(env.APP_ENV),
-    sessionId,
+    signedValue,
     buildAuthCookieOptions(env.APP_ENV, getSessionCookieMaxAge()),
   );
 }
@@ -29,7 +37,13 @@ export async function getSessionIdFromCookies(): Promise<string | null> {
   const cookieStore = await cookies();
   const local = cookieStore.get("session")?.value;
   const host = cookieStore.get("__Host-session")?.value;
-  return local ?? host ?? null;
+  const rawValue = local ?? host ?? null;
+
+  if (!rawValue) {
+    return null;
+  }
+
+  return parseSessionCookieValue(rawValue, env.SESSION_SECRET);
 }
 
 export async function setPendingLoginCookie(

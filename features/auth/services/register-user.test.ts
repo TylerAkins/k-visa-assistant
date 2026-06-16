@@ -11,6 +11,9 @@ vi.mock("@/db", () => ({
         ]),
       }),
     }),
+    delete: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    }),
   },
 }));
 
@@ -78,6 +81,7 @@ describe("registerUserService", () => {
     );
 
     expect(result.success).toBe(true);
+    expect(result.verificationEmailSent).toBe(false);
   });
 
   it("returns rate limit error when exceeded", async () => {

@@ -40,6 +40,12 @@ export function LoginForm({ initialRequiresTotp = false }: LoginFormProps) {
         description="Enter the 6-digit code from your authenticator app or a recovery code."
       >
         <FormMessage message={state.error} />
+        {state.fieldErrors?.code ? (
+          <FormMessage message={state.fieldErrors.code[0]} />
+        ) : null}
+        {state.fieldErrors?.recoveryCode ? (
+          <FormMessage message={state.fieldErrors.recoveryCode[0]} />
+        ) : null}
         <form action={totpAction} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="code">Authenticator code</Label>
@@ -57,7 +63,7 @@ export function LoginForm({ initialRequiresTotp = false }: LoginFormProps) {
               id="recoveryCode"
               name="recoveryCode"
               autoComplete="off"
-              placeholder="abcd-ef01"
+              placeholder="a1b2c3d4-e5f67890"
             />
           </div>
           <Button type="submit" className="w-full" disabled={pending}>
@@ -74,6 +80,12 @@ export function LoginForm({ initialRequiresTotp = false }: LoginFormProps) {
       description="Access your account to manage security settings."
     >
       <FormMessage message={state.error} />
+      {state.fieldErrors?.email ? (
+        <FormMessage message={state.fieldErrors.email[0]} />
+      ) : null}
+      {state.fieldErrors?.password ? (
+        <FormMessage message={state.fieldErrors.password[0]} />
+      ) : null}
       <form action={loginAction} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>

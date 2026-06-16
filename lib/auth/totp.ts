@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
-import { randomInt } from "node:crypto";
 
 import { generateSecret, verify } from "otplib";
 
@@ -71,12 +70,8 @@ export async function verifyTotpCode(
 export function generateRecoveryCodes(): string[] {
   const codes: string[] = [];
   for (let index = 0; index < RECOVERY_CODE_COUNT; index += 1) {
-    const partA = randomInt(0, 0xffff)
-      .toString(16)
-      .padStart(4, "0");
-    const partB = randomInt(0, 0xffff)
-      .toString(16)
-      .padStart(4, "0");
+    const partA = randomBytes(4).toString("hex");
+    const partB = randomBytes(4).toString("hex");
     codes.push(`${partA}-${partB}`);
   }
   return codes;

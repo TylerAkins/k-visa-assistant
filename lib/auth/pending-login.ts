@@ -22,6 +22,7 @@ export async function purgeExpiredPendingLogins(): Promise<void> {
 
 export async function createPendingLogin(userId: string): Promise<PendingLogin> {
   await purgeExpiredPendingLogins();
+  await deletePendingLoginsForUser(userId);
 
   const expiresAt = new Date(Date.now() + PENDING_LOGIN_TTL_MS);
   const [pending] = await db

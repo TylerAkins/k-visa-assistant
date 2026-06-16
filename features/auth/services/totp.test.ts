@@ -116,19 +116,19 @@ describe("totp services", () => {
 
   it("rejects begin setup when unauthenticated", async () => {
     vi.mocked(getAuthSession).mockResolvedValue(null);
-    const result = await beginTotpSetupService();
+    const result = await beginTotpSetupService("127.0.0.1");
     expect(result.success).toBe(false);
   });
 
   it("rejects begin setup when already enabled", async () => {
     selectLimit([{ id: "totp-1", enabled: true }]);
-    const result = await beginTotpSetupService();
+    const result = await beginTotpSetupService("127.0.0.1");
     expect(result.success).toBe(false);
   });
 
   it("starts setup for new user", async () => {
     selectLimit([]);
-    const result = await beginTotpSetupService();
+    const result = await beginTotpSetupService("127.0.0.1");
     expect(result.success).toBe(true);
     expect(result.qrDataUrl).toContain("data:image");
     expect(mockDb.insert).toHaveBeenCalled();
@@ -136,7 +136,7 @@ describe("totp services", () => {
 
   it("updates existing disabled setup", async () => {
     selectLimit([{ id: "totp-1", enabled: false }]);
-    const result = await beginTotpSetupService();
+    const result = await beginTotpSetupService("127.0.0.1");
     expect(result.success).toBe(true);
     expect(mockDb.update).toHaveBeenCalled();
   });
@@ -305,7 +305,7 @@ describe("totp services", () => {
     vi.mocked(markRecoveryCodeUsed).mockResolvedValue(true);
 
     const result = await disableTotpService(
-      { password: "SecurePass123!", code: "a1b2-c3d4" },
+      { password: "SecurePass123!", code: "a1b2c3d4-e5f67890" },
       "127.0.0.1",
     );
     expect(result.success).toBe(true);
@@ -429,7 +429,7 @@ describe("totp services", () => {
     vi.mocked(verifyRecoveryCode).mockResolvedValue(false);
 
     const result = await disableTotpService(
-      { password: "SecurePass123!", code: "a1b2-c3d4" },
+      { password: "SecurePass123!", code: "a1b2c3d4-e5f67890" },
       "127.0.0.1",
     );
     expect(result.success).toBe(false);

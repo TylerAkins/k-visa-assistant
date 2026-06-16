@@ -1,6 +1,6 @@
 "use server";
 
-import { getRequestClientIp } from "@/lib/security/client-ip";
+import { getAuthClientIp } from "@/lib/security/auth-client-ip";
 import { registerUserService } from "@/features/auth/services/register-user";
 import type { ActionResult } from "@/features/auth/types";
 
@@ -8,7 +8,7 @@ export async function registerUser(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
 
   return registerUserService(
     {

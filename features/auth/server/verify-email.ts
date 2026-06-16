@@ -1,6 +1,6 @@
 "use server";
 
-import { getRequestClientIp } from "@/lib/security/client-ip";
+import { getAuthClientIp } from "@/lib/security/auth-client-ip";
 import {
   resendVerificationEmailService,
   verifyEmailService,
@@ -15,11 +15,11 @@ export async function verifyEmail(
   _prevState: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   return verifyEmailService(formDataToRecord(formData), clientIp);
 }
 
 export async function resendVerificationEmail(): Promise<ActionResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   return resendVerificationEmailService(clientIp);
 }

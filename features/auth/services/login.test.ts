@@ -107,6 +107,25 @@ describe("loginUserService", () => {
     expect(result.error).toBe("Invalid email or password.");
   });
 
+  it("rejects unverified email with valid password", async () => {
+    const passwordHash = await hashPassword("SecurePass123!");
+    vi.mocked(findUserByEmail).mockResolvedValue({
+      id: "user-1",
+      email: "user@example.com",
+      passwordHash,
+      emailVerified: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await loginUserService(
+      { email: "user@example.com", password: "SecurePass123!" },
+      "127.0.0.1",
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Verify your email before signing in.");
+  });
+
   it("returns redirect target when password is valid and totp disabled", async () => {
     const passwordHash = await hashPassword("SecurePass123!");
     vi.mocked(findUserByEmail).mockResolvedValue({
@@ -238,7 +257,7 @@ describe("verifyLoginTotpService", () => {
     vi.mocked(markRecoveryCodeUsed).mockResolvedValue(true);
 
     const result = await verifyLoginTotpService(
-      { recoveryCode: "a1b2-c3d4" },
+      { recoveryCode: "a1b2c3d4-e5f67890" },
       "127.0.0.1",
     );
     expect(result.success).toBe(true);
@@ -307,7 +326,7 @@ describe("verifyLoginTotpService", () => {
     vi.mocked(markRecoveryCodeUsed).mockResolvedValue(true);
 
     const result = await verifyLoginTotpService(
-      { recoveryCode: "a1b2-c3d4" },
+      { recoveryCode: "a1b2c3d4-e5f67890" },
       "127.0.0.1",
     );
     expect(result.success).toBe(true);
@@ -369,7 +388,7 @@ describe("verifyLoginTotpService", () => {
     mockPendingLogin.incrementPendingLoginAttempts.mockResolvedValue(1);
 
     const result = await verifyLoginTotpService(
-      { recoveryCode: "a1b2-c3d4" },
+      { recoveryCode: "a1b2c3d4-e5f67890" },
       "127.0.0.1",
     );
     expect(result.success).toBe(false);

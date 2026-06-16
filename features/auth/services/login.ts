@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { recoveryCodes, totpSettings } from "@/db/schema";
 import {
+  EMAIL_NOT_VERIFIED_MESSAGE,
   LOGIN_INVALID_MESSAGE,
   MAX_PENDING_LOGIN_ATTEMPTS,
   TOTP_INVALID_MESSAGE,
@@ -74,6 +75,10 @@ export async function loginUserService(
 
   if (!user || !passwordValid) {
     return { success: false, error: LOGIN_INVALID_MESSAGE };
+  }
+
+  if (!user.emailVerified) {
+    return { success: false, error: EMAIL_NOT_VERIFIED_MESSAGE };
   }
 
   const [totp] = await db

@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { getRequestClientIp } from "@/lib/security/client-ip";
+import { getAuthClientIp } from "@/lib/security/auth-client-ip";
 import {
   getLoginStateService,
   loginUserService,
@@ -18,7 +18,7 @@ export async function loginUser(
   _prevState: LoginResult,
   formData: FormData,
 ): Promise<LoginResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   const result = await loginUserService(formDataToRecord(formData), clientIp);
 
   if (result.success && result.redirectTo) {
@@ -32,7 +32,7 @@ export async function verifyLoginTotp(
   _prevState: LoginResult,
   formData: FormData,
 ): Promise<LoginResult> {
-  const clientIp = await getRequestClientIp({ trustProxy: false });
+  const clientIp = await getAuthClientIp();
   const result = await verifyLoginTotpService(
     formDataToRecord(formData),
     clientIp,
