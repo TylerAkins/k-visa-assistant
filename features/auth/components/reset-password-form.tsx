@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ type ResetPasswordFormProps = {
 
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const [state, action, pending] = useActionState(resetPassword, initialState);
+  const [password, setPassword] = useState("");
 
   return (
     <AuthCard
@@ -43,9 +44,14 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             type="password"
             autoComplete="new-password"
             aria-describedby="reset-password-requirements"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
             required
           />
-          <PasswordRequirements id="reset-password-requirements" />
+          <PasswordRequirements
+            id="reset-password-requirements"
+            password={password}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm new password</Label>

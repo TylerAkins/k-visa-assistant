@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,16 +18,37 @@ export function ForgotPasswordForm() {
     requestPasswordReset,
     initialState,
   );
+  const [email, setEmail] = useState("");
+
+  if (state.success) {
+    return (
+      <AuthCard
+        title="Check your email"
+        description={
+          email
+            ? `If ${email} is registered, we sent password reset instructions.`
+            : "If that address is registered, we sent password reset instructions."
+        }
+      >
+        <div className="space-y-4 text-sm text-muted-foreground">
+          <p>
+            Open the link in the email to choose a new password. The link
+            expires after one hour.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/login">Back to sign in</Link>
+          </Button>
+        </div>
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard
       title="Forgot password"
       description="We will email a reset link if an account exists for that address."
     >
-      <FormMessage
-        message={state.error}
-        variant={state.success ? "success" : "error"}
-      />
+      {state.error ? <FormMessage message={state.error} /> : null}
       {state.fieldErrors?.email ? (
         <FormMessage message={state.fieldErrors.email[0]} />
       ) : null}
@@ -39,6 +60,8 @@ export function ForgotPasswordForm() {
             name="email"
             type="email"
             autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             required
           />
         </div>

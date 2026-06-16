@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,18 +16,42 @@ const initialState: ActionResult = { success: false };
 
 export function RegisterForm() {
   const [state, action, pending] = useActionState(registerUser, initialState);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  if (state.success) {
+    return (
+      <AuthCard
+        title="Check your email"
+        description={
+          email
+            ? `We sent a verification link to ${email}.`
+            : "We sent a verification link to finish creating your account."
+        }
+      >
+        <div className="space-y-4 text-sm text-muted-foreground">
+          <p>
+            Open the link in that email to verify your account. Once verified,
+            sign in to continue setting up your case.
+          </p>
+          <p>
+            The message can take a minute to arrive. Check spam if you do not
+            see it.
+          </p>
+          <Button asChild className="w-full">
+            <Link href="/login">Go to sign in</Link>
+          </Button>
+        </div>
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard
       title="Create account"
       description="Start your K-1 visa workflow with a secure account."
     >
-      {state.success || state.error ? (
-        <FormMessage
-          message={state.error}
-          variant={state.success ? "success" : "error"}
-        />
-      ) : null}
+      {state.error ? <FormMessage message={state.error} /> : null}
       {state.fieldErrors?.email ? (
         <FormMessage message={state.fieldErrors.email[0]} />
       ) : null}
@@ -45,6 +69,8 @@ export function RegisterForm() {
             name="email"
             type="email"
             autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             required
           />
         </div>
@@ -56,9 +82,14 @@ export function RegisterForm() {
             type="password"
             autoComplete="new-password"
             aria-describedby="register-password-requirements"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
             required
           />
-          <PasswordRequirements id="register-password-requirements" />
+          <PasswordRequirements
+            id="register-password-requirements"
+            password={password}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirmPassword">Confirm password</Label>
