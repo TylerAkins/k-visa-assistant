@@ -2,6 +2,7 @@
 
 import { getAuthClientIp } from "@/lib/security/auth-client-ip";
 import {
+  resendVerificationByEmailService,
   resendVerificationEmailService,
   verifyEmailService,
 } from "@/features/auth/services/verify-email";
@@ -22,4 +23,12 @@ export async function verifyEmail(
 export async function resendVerificationEmail(): Promise<ActionResult> {
   const clientIp = await getAuthClientIp();
   return resendVerificationEmailService(clientIp);
+}
+
+export async function resendVerificationByEmail(
+  _prevState: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const clientIp = await getAuthClientIp();
+  return resendVerificationByEmailService(formDataToRecord(formData), clientIp);
 }

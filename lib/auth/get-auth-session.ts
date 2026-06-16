@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  clearAuthCookies,
+  clearSessionCookie,
   getSessionIdFromCookies,
   hasRawSessionCookieValue,
 } from "@/lib/auth/cookies";
@@ -13,14 +13,14 @@ export async function getAuthSession(): Promise<SessionResult | null> {
 
   if (!sessionId) {
     if (hasRawCookie) {
-      await clearAuthCookies();
+      await clearSessionCookie();
     }
     return null;
   }
 
   const session = await getSession(sessionId);
   if (!session) {
-    await clearAuthCookies();
+    await clearSessionCookie();
     return null;
   }
 

@@ -264,6 +264,23 @@ describe("verifyLoginTotpService", () => {
     expect(result.redirectTo).toBe("/account/settings");
   });
 
+  it("rejects when both totp and recovery code are provided", async () => {
+    vi.mocked(getPendingLoginIdFromCookies).mockResolvedValue("pending-1");
+    vi.mocked(getPendingLogin).mockResolvedValue({
+      id: "pending-1",
+      userId: "user-1",
+      attempts: 0,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const result = await verifyLoginTotpService(
+      { code: "123456", recoveryCode: "a1b2c3d4-e5f67890" },
+      "127.0.0.1",
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Invalid code.");
+  });
+
   it("rejects expired pending login", async () => {
     vi.mocked(getPendingLoginIdFromCookies).mockResolvedValue("pending-1");
     vi.mocked(getPendingLogin).mockResolvedValue(null);

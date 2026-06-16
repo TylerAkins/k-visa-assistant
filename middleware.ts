@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import {
+  PENDING_LOGIN_COOKIE_NAME_HOST,
+  PENDING_LOGIN_COOKIE_NAME_LOCAL,
   SESSION_COOKIE_NAME_HOST,
   SESSION_COOKIE_NAME_LOCAL,
 } from "@/lib/auth/constants";
@@ -18,43 +20,29 @@ function getSessionCookieValue(request: NextRequest): string | null {
   );
 }
 
+function getPendingLoginCookieValue(request: NextRequest): string | null {
+  return (
+    request.cookies.get(PENDING_LOGIN_COOKIE_NAME_LOCAL)?.value ??
+    request.cookies.get(PENDING_LOGIN_COOKIE_NAME_HOST)?.value ??
+    null
+  );
+}
+
 function clearSessionCookies(response: NextResponse): void {
   response.cookies.delete(SESSION_COOKIE_NAME_LOCAL);
   response.cookies.delete(SESSION_COOKIE_NAME_HOST);
 }
 
-function getConnectingIp(request: NextRequest): string | null {
-  return (
-    request.headers.get("x-real-ip") ??
-    request.headers.get("cf-connecting-ip") ??
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    null
-  );
-}
-
-function withConnectingIp(request: NextRequest): Headers {
-  const requestHeaders = new Headers(request.headers);
-  const connectingIp = getConnectingIp(request);
-
-  if (connectingIp) {
-    requestHeaders.set("x-connecting-ip", connectingIp);
-  }
-
-  return requestHeaders;
-}
-
-function nextWithConnectingIp(request: NextRequest): NextResponse {
-  return NextResponse.next({
-    request: {
-      headers: withConnectingIp(request),
-    },
-  });
+function clearPendingLoginCookies(response: NextResponse): void {
+  response.cookies.delete(PENDING_LOGIN_COOKIE_NAME_LOCAL);
+  response.cookies.delete(PENDING_LOGIN_COOKIE_NAME_HOST);
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionSecret = process.env.SESSION_SECRET;
   const rawSessionCookie = getSessionCookieValue(request);
+  const rawPendingLoginCookie = getPendingLoginCookieValue(request);
   let sessionPresent = false;
 
   if (rawSessionCookie && sessionSecret) {
@@ -64,27 +52,35 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/account") && !sessionPresent) {
-    const response = NextResponse.redirect(new URL("/login", request.url));
-    const connectingIp = getConnectingIp(request);
-    if (connectingIp) {
-      response.headers.set("x-connecting-ip", connectingIp);
-    }
-    return response;
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (guestPaths.includes(pathname) && rawSessionCookie && !sessionPresent) {
-    const response = nextWithConnectingIp(request);
-    clearSessionCookies(response);
+  if (guestPaths.includes(pathname)) {
+    const response = NextResponse.next();
+
+    if (rawSessionCookie && !sessionPresent) {
+      clearSessionCookies(response);
+    }
+
+    if (rawPendingLoginCookie && sessionSecret) {
+      const pendingPresent = Boolean(
+        await parseSessionCookieValue(rawPendingLoginCookie, sessionSecret),
+      );
+      if (!pendingPresent) {
+        clearPendingLoginCookies(response);
+      }
+    }
+
     return response;
   }
 
   if (sensitiveTokenPaths.includes(pathname)) {
-    const response = nextWithConnectingIp(request);
+    const response = NextResponse.next();
     response.headers.set("Referrer-Policy", "no-referrer");
     return response;
   }
 
-  return nextWithConnectingIp(request);
+  return NextResponse.next();
 }
 
 export const config = {

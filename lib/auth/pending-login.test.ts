@@ -128,6 +128,21 @@ describe("pending-login", () => {
     expect(count).toBe(1);
   });
 
+  it("reuses valid existing pending login for user", async () => {
+    const { db } = await import("@/db");
+    vi.mocked(db.insert).mockClear();
+    mockState.pendingRow = {
+      id: "existing-pending",
+      userId: "user-1",
+      attemptCount: 1,
+      expiresAt: new Date(Date.now() + 60_000),
+    };
+
+    const pending = await createPendingLogin("user-1");
+    expect(pending.id).toBe("existing-pending");
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it("deletes pending logins", async () => {
     await deletePendingLogin("pending-1");
     await deletePendingLoginsForUser("user-1");

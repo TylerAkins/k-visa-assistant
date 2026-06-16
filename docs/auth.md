@@ -51,10 +51,12 @@ Cookie attributes:
 - `__Host-` prefix in non-local environments
 - Value is `sessionId.HMAC-SHA256` using `SESSION_SECRET` (middleware validates signature)
 
-- Client IP for rate limits uses `X-Forwarded-For` / `X-Real-IP` in non-local environments (`getAuthClientIp`).
-- Set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` in production only when behind a reverse proxy; forwarded headers are ignored otherwise.
-- Stale signed session cookies are cleared when the DB session is missing (`getAuthSession`).
+- Client IP for rate limits uses `X-Forwarded-For` / `X-Real-IP` only when `TRUST_PROXY_HEADERS=true` and the direct peer (`x-connecting-peer`) is listed in `TRUSTED_PROXY_CIDRS`; otherwise a hashed fingerprint is used.
+- Your reverse proxy must set `x-connecting-peer` to the TCP peer IP of the app connection. Bind the Node process to localhost so only the proxy can reach it.
+- Stale signed session cookies are cleared when the DB session is missing (`getAuthSession` clears session cookies only, preserving pending-login cookies during TOTP).
 - Guest routes no longer redirect purely on cookie signature; login page redirects when a live session exists.
+- Invalid signed cookies are cleared on guest routes by middleware (session and pending-login separately).
+- Unverified users can resend verification email from the login page without signing in.
 
 ## Email verification
 
@@ -105,8 +107,8 @@ In-memory per-process limits in `lib/security/auth-rate-limit.ts`:
 | Variable | Purpose |
 |----------|---------|
 | `SESSION_SECRET` | HMAC signing for session cookies (min 32 chars) |
-| `TRUST_PROXY_HEADERS` | When `true`, trust `X-Forwarded-For` only from `TRUSTED_PROXY_CIDRS` |
-| `TRUSTED_PROXY_CIDRS` | Comma-separated IPv4 CIDRs for trusted reverse proxies |
+| `TRUST_PROXY_HEADERS` | When `true`, trust `X-Forwarded-For` only when `x-connecting-peer` is in `TRUSTED_PROXY_CIDRS` |
+| `TRUSTED_PROXY_CIDRS` | Comma-separated IPv4 CIDRs for trusted reverse proxies (must match `x-connecting-peer`) |
 | `ENCRYPTION_KEY` | TOTP secret encryption at rest (min 32 chars) |
 | `EMAIL_PROVIDER` | `console` (default) or future providers |
 

@@ -14,7 +14,7 @@ type GetRequestClientIpOptions = {
 };
 
 const MAX_IP_LENGTH = 45;
-const CONNECTING_IP_HEADER = "x-connecting-ip";
+const CONNECTING_PEER_HEADER = "x-connecting-peer";
 
 function normalizeTrustedIp(value: string | null): string | null {
   const candidate = value?.trim();
@@ -53,15 +53,15 @@ export async function getRequestClientIp(
   options: GetRequestClientIpOptions,
 ): Promise<string> {
   const headerStore = await headers();
-  const connectingIp = normalizeTrustedIp(
-    headerStore.get(CONNECTING_IP_HEADER),
-  );
 
   if (options.trustProxy) {
+    const connectingPeer = normalizeTrustedIp(
+      headerStore.get(CONNECTING_PEER_HEADER),
+    );
     const proxyIsTrusted =
-      connectingIp &&
+      connectingPeer &&
       options.trustedProxyCidrs &&
-      isIpv4InAnyCidr(connectingIp, options.trustedProxyCidrs);
+      isIpv4InAnyCidr(connectingPeer, options.trustedProxyCidrs);
 
     if (proxyIsTrusted) {
       const forwardedIp = readForwardedClientIp(headerStore);
@@ -70,19 +70,11 @@ export async function getRequestClientIp(
       }
     }
 
-    if (connectingIp) {
-      return connectingIp;
-    }
-
     return `fp:${hashClientFingerprint(headerStore)}`;
   }
 
   if (options.localFallback) {
     return options.localFallback;
-  }
-
-  if (connectingIp) {
-    return connectingIp;
   }
 
   return `fp:${hashClientFingerprint(headerStore)}`;

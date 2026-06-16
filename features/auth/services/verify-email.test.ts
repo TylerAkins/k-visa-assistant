@@ -30,13 +30,16 @@ vi.mock("@/lib/email", () => ({
 
 vi.mock("@/features/auth/services/user-repository", () => ({
   createEmailVerificationToken: vi.fn().mockResolvedValue("verify-token"),
+  findUserByEmail: vi.fn(),
 }));
 
 import { getAuthSession } from "@/lib/auth/get-auth-session";
 import {
+  resendVerificationByEmailService,
   resendVerificationEmailService,
   verifyEmailService,
 } from "@/features/auth/services/verify-email";
+import { findUserByEmail } from "@/features/auth/services/user-repository";
 import { generateSecureToken, hashToken } from "@/lib/auth/tokens";
 
 const authSession = {
@@ -45,8 +48,10 @@ const authSession = {
 };
 
 describe("verify-email services", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { resetRateLimitsForTests } = await import("@/lib/security/rate-limit");
+    resetRateLimitsForTests();
     mockDb.transaction.mockImplementation(async (callback) =>
       callback({
         update: vi.fn().mockReturnValue({
@@ -119,6 +124,50 @@ describe("verify-email services", () => {
   it("resends verification email", async () => {
     vi.mocked(getAuthSession).mockResolvedValue(authSession);
     const result = await resendVerificationEmailService("127.0.0.1");
+    expect(result.success).toBe(true);
+  });
+
+  it("returns generic success for guest resend when user is unverified", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue({
+      id: "user-1",
+      email: "user@example.com",
+      passwordHash: "hash",
+      emailVerified: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await resendVerificationByEmailService(
+      { email: "user@example.com" },
+      "127.0.0.1",
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("returns generic success for guest resend when user does not exist", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue(null);
+
+    const result = await resendVerificationByEmailService(
+      { email: "missing@example.com" },
+      "127.0.0.1",
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("returns generic success for guest resend when user is already verified", async () => {
+    vi.mocked(findUserByEmail).mockResolvedValue({
+      id: "user-1",
+      email: "user@example.com",
+      passwordHash: "hash",
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await resendVerificationByEmailService(
+      { email: "user@example.com" },
+      "127.0.0.1",
+    );
     expect(result.success).toBe(true);
   });
 

@@ -18,9 +18,27 @@ import {
   rateLimitError,
   unauthorizedResult,
 } from "@/features/auth/services/action-utils";
-import { createEmailVerificationToken } from "@/features/auth/services/user-repository";
+import {
+  createEmailVerificationToken,
+  findUserByEmail,
+} from "@/features/auth/services/user-repository";
 import type { ActionResult } from "@/features/auth/types";
-import { verifyEmailSchema } from "@/features/auth/validation/schemas";
+import {
+  resendVerificationSchema,
+  verifyEmailSchema,
+} from "@/features/auth/validation/schemas";
+
+async function sendVerificationEmail(
+  email: string,
+  token: string,
+): Promise<void> {
+  const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
+  await getEmailProvider().send({
+    to: email,
+    subject: "Verify your KVisaAssistant email",
+    text: `Verify your email by visiting: ${verifyUrl}`,
+  });
+}
 
 export async function verifyEmailService(
   input: Record<string, FormDataEntryValue | null>,
@@ -105,16 +123,45 @@ export async function resendVerificationEmailService(
   }
 
   const token = await createEmailVerificationToken(authSession.user.id);
-  const verifyUrl = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
 
   try {
-    await getEmailProvider().send({
-      to: authSession.user.email,
-      subject: "Verify your KVisaAssistant email",
-      text: `Verify your email by visiting: ${verifyUrl}`,
-    });
+    await sendVerificationEmail(authSession.user.email, token);
   } catch {
     return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
+  }
+
+  return { success: true, error: VERIFICATION_RESEND_MESSAGE };
+}
+
+export async function resendVerificationByEmailService(
+  input: Record<string, FormDataEntryValue | null>,
+  clientIp: string,
+): Promise<ActionResult> {
+  const parsed = resendVerificationSchema.safeParse({
+    email: input.email,
+  });
+
+  if (!parsed.success) {
+    return { success: false, fieldErrors: formatZodErrors(parsed.error) };
+  }
+
+  const rateLimit = checkAuthRateLimits("resend", [
+    `ip:${clientIp}`,
+    `email:${parsed.data.email}`,
+  ]);
+  if (!rateLimit.allowed) {
+    return rateLimitError(rateLimit.retryAfterSeconds);
+  }
+
+  const user = await findUserByEmail(parsed.data.email);
+
+  if (user && !user.emailVerified) {
+    try {
+      const token = await createEmailVerificationToken(user.id);
+      await sendVerificationEmail(user.email, token);
+    } catch {
+      return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
+    }
   }
 
   return { success: true, error: VERIFICATION_RESEND_MESSAGE };

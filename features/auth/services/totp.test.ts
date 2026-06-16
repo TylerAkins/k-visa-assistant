@@ -153,6 +153,16 @@ describe("totp services", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects begin setup with wrong password", async () => {
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockBeginSetupSelects([{ id: "user-1", passwordHash }], []);
+    const result = await beginTotpSetupService(
+      { password: "WrongPass123!" },
+      "127.0.0.1",
+    );
+    expect(result.success).toBe(false);
+  });
+
   it("starts setup for new user", async () => {
     const passwordHash = await hashPassword("SecurePass123!");
     mockBeginSetupSelects([{ id: "user-1", passwordHash }], []);
