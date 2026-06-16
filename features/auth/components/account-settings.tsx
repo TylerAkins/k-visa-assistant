@@ -32,6 +32,7 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [beginTotpError, setBeginTotpError] = useState<string | null>(null);
+  const [setupPassword, setSetupPassword] = useState("");
   const [resendState, resendAction, resendPending] = useActionState(
     async (_prev: ActionResult) => resendVerificationEmail(),
     initialActionState,
@@ -52,11 +53,13 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
   const handleBeginTotp = () => {
     startTransition(async () => {
       setBeginTotpError(null);
-      const result = await beginTotpSetup();
+      const result = await beginTotpSetup(setupPassword);
       if (result.qrDataUrl) {
         setQrDataUrl(result.qrDataUrl);
       } else if (result.error) {
         setBeginTotpError(result.error);
+      } else if (result.fieldErrors?.password?.[0]) {
+        setBeginTotpError(result.fieldErrors.password[0]);
       }
     });
   };
@@ -128,14 +131,27 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
             <div className="mt-4 space-y-4">
               <FormMessage message={beginTotpError ?? undefined} />
               {!qrDataUrl ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleBeginTotp}
-                  disabled={isPending}
-                >
-                  {isPending ? "Preparing..." : "Set up authenticator"}
-                </Button>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="setup-password">Current password</Label>
+                    <Input
+                      id="setup-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={setupPassword}
+                      onChange={(event) => setSetupPassword(event.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleBeginTotp}
+                    disabled={isPending || setupPassword.length === 0}
+                  >
+                    {isPending ? "Preparing..." : "Set up authenticator"}
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-4">
                   <img

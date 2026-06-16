@@ -56,6 +56,10 @@ export const recoveryCodeSchema = z.object({
     ),
 });
 
+export const beginTotpSetupSchema = z.object({
+  password: z.string().min(1, "Password is required"),
+});
+
 export const disableTotpSchema = z.object({
   password: z.string().min(1, "Password is required"),
   code: z.string().min(1, "Code is required"),

@@ -14,9 +14,11 @@ function formDataToRecord(formData: FormData) {
   return Object.fromEntries(formData.entries());
 }
 
-export async function beginTotpSetup(): Promise<TotpSetupResult> {
+export async function beginTotpSetup(
+  password: string,
+): Promise<TotpSetupResult> {
   const clientIp = await getAuthClientIp();
-  return beginTotpSetupService(clientIp);
+  return beginTotpSetupService({ password }, clientIp);
 }
 
 export async function confirmTotpSetup(

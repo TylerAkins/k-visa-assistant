@@ -80,6 +80,23 @@ function selectLimit(result: unknown[]) {
   });
 }
 
+function mockBeginSetupSelects(
+  userResult: unknown[],
+  totpResult: unknown[],
+) {
+  let callCount = 0;
+  mockDb.select.mockImplementation(() => ({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockImplementation(async () => {
+          callCount += 1;
+          return callCount === 1 ? userResult : totpResult;
+        }),
+      }),
+    }),
+  }));
+}
+
 describe("totp services", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -116,27 +133,48 @@ describe("totp services", () => {
 
   it("rejects begin setup when unauthenticated", async () => {
     vi.mocked(getAuthSession).mockResolvedValue(null);
-    const result = await beginTotpSetupService("127.0.0.1");
+    const result = await beginTotpSetupService(
+      { password: "SecurePass123!" },
+      "127.0.0.1",
+    );
     expect(result.success).toBe(false);
   });
 
   it("rejects begin setup when already enabled", async () => {
-    selectLimit([{ id: "totp-1", enabled: true }]);
-    const result = await beginTotpSetupService("127.0.0.1");
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockBeginSetupSelects(
+      [{ id: "user-1", passwordHash }],
+      [{ id: "totp-1", enabled: true }],
+    );
+    const result = await beginTotpSetupService(
+      { password: "SecurePass123!" },
+      "127.0.0.1",
+    );
     expect(result.success).toBe(false);
   });
 
   it("starts setup for new user", async () => {
-    selectLimit([]);
-    const result = await beginTotpSetupService("127.0.0.1");
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockBeginSetupSelects([{ id: "user-1", passwordHash }], []);
+    const result = await beginTotpSetupService(
+      { password: "SecurePass123!" },
+      "127.0.0.1",
+    );
     expect(result.success).toBe(true);
     expect(result.qrDataUrl).toContain("data:image");
     expect(mockDb.insert).toHaveBeenCalled();
   });
 
   it("updates existing disabled setup", async () => {
-    selectLimit([{ id: "totp-1", enabled: false }]);
-    const result = await beginTotpSetupService("127.0.0.1");
+    const passwordHash = await hashPassword("SecurePass123!");
+    mockBeginSetupSelects(
+      [{ id: "user-1", passwordHash }],
+      [{ id: "totp-1", enabled: false }],
+    );
+    const result = await beginTotpSetupService(
+      { password: "SecurePass123!" },
+      "127.0.0.1",
+    );
     expect(result.success).toBe(true);
     expect(mockDb.update).toHaveBeenCalled();
   });

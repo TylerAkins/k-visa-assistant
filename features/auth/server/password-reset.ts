@@ -1,5 +1,6 @@
 "use server";
 
+import { clearAuthCookies } from "@/lib/auth/cookies";
 import { getAuthClientIp } from "@/lib/security/auth-client-ip";
 import {
   requestPasswordResetService,
@@ -24,5 +25,11 @@ export async function resetPassword(
   formData: FormData,
 ): Promise<ActionResult> {
   const clientIp = await getAuthClientIp();
-  return resetPasswordService(formDataToRecord(formData), clientIp);
+  const result = await resetPasswordService(formDataToRecord(formData), clientIp);
+
+  if (result.success) {
+    await clearAuthCookies();
+  }
+
+  return result;
 }

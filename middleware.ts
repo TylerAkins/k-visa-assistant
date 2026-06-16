@@ -8,6 +8,7 @@ import {
 import { parseSessionCookieValue } from "@/lib/auth/session-cookie";
 
 const guestPaths = ["/login", "/register", "/forgot-password"];
+const sensitiveTokenPaths = ["/verify-email", "/reset-password"];
 
 function getSessionCookieValue(request: NextRequest): string | null {
   return (
@@ -20,6 +21,34 @@ function getSessionCookieValue(request: NextRequest): string | null {
 function clearSessionCookies(response: NextResponse): void {
   response.cookies.delete(SESSION_COOKIE_NAME_LOCAL);
   response.cookies.delete(SESSION_COOKIE_NAME_HOST);
+}
+
+function getConnectingIp(request: NextRequest): string | null {
+  return (
+    request.headers.get("x-real-ip") ??
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    null
+  );
+}
+
+function withConnectingIp(request: NextRequest): Headers {
+  const requestHeaders = new Headers(request.headers);
+  const connectingIp = getConnectingIp(request);
+
+  if (connectingIp) {
+    requestHeaders.set("x-connecting-ip", connectingIp);
+  }
+
+  return requestHeaders;
+}
+
+function nextWithConnectingIp(request: NextRequest): NextResponse {
+  return NextResponse.next({
+    request: {
+      headers: withConnectingIp(request),
+    },
+  });
 }
 
 export async function middleware(request: NextRequest) {
@@ -35,22 +64,36 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/account") && !sessionPresent) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const response = NextResponse.redirect(new URL("/login", request.url));
+    const connectingIp = getConnectingIp(request);
+    if (connectingIp) {
+      response.headers.set("x-connecting-ip", connectingIp);
+    }
+    return response;
   }
 
   if (guestPaths.includes(pathname) && rawSessionCookie && !sessionPresent) {
-    const response = NextResponse.next();
+    const response = nextWithConnectingIp(request);
     clearSessionCookies(response);
     return response;
   }
 
-  if (guestPaths.includes(pathname) && sessionPresent) {
-    return NextResponse.redirect(new URL("/account/settings", request.url));
+  if (sensitiveTokenPaths.includes(pathname)) {
+    const response = nextWithConnectingIp(request);
+    response.headers.set("Referrer-Policy", "no-referrer");
+    return response;
   }
 
-  return NextResponse.next();
+  return nextWithConnectingIp(request);
 }
 
 export const config = {
-  matcher: ["/account/:path*", "/login", "/register", "/forgot-password"],
+  matcher: [
+    "/account/:path*",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/verify-email",
+    "/reset-password",
+  ],
 };

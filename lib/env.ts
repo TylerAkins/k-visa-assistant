@@ -18,6 +18,8 @@ export const env: Env = parseEnvConfig({
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   EMAIL_PROVIDER: process.env.EMAIL_PROVIDER,
   DEV_ALLOWED_CIDRS: process.env.DEV_ALLOWED_CIDRS,
+  TRUST_PROXY_HEADERS: process.env.TRUST_PROXY_HEADERS,
+  TRUSTED_PROXY_CIDRS: process.env.TRUSTED_PROXY_CIDRS,
 });
 
 export const isLocal = isLocalEnv(env.APP_ENV);

@@ -2,6 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 
+import { isPostgresUniqueViolation } from "@/db/errors";
 import { users } from "@/db/schema";
 import {
   EMAIL_DELIVERY_FAILED_MESSAGE,
@@ -36,6 +37,30 @@ async function sendVerificationEmail(
   });
 }
 
+async function resendVerificationForUnverifiedUser(
+  userId: string,
+  email: string,
+  passwordHash: string,
+): Promise<ActionResult> {
+  await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  try {
+    const token = await createEmailVerificationToken(userId);
+    await sendVerificationEmail(email, token);
+  } catch {
+    return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
+  }
+
+  return {
+    success: true,
+    error: REGISTRATION_EMAIL_MESSAGE,
+    verificationEmailSent: true,
+  };
+}
+
 export async function registerUserService(
   input: Record<string, FormDataEntryValue | null>,
   clientIp: string,
@@ -68,10 +93,32 @@ export async function registerUserService(
   }
 
   if (existingUser && !existingUser.emailVerified) {
+    return resendVerificationForUnverifiedUser(
+      existingUser.id,
+      existingUser.email,
+      passwordHash,
+    );
+  }
+
+  try {
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: parsed.data.email,
+        passwordHash,
+        emailVerified: false,
+      })
+      .returning();
+
+    if (!user) {
+      return { success: false, error: "Unable to create account." };
+    }
+
     try {
-      const token = await createEmailVerificationToken(existingUser.id);
-      await sendVerificationEmail(existingUser.email, token);
+      const token = await createEmailVerificationToken(user.id);
+      await sendVerificationEmail(user.email, token);
     } catch {
+      await db.delete(users).where(eq(users.id, user.id));
       return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
     }
 
@@ -80,32 +127,24 @@ export async function registerUserService(
       error: REGISTRATION_EMAIL_MESSAGE,
       verificationEmailSent: true,
     };
+  } catch (error) {
+    if (isPostgresUniqueViolation(error)) {
+      const racedUser = await findUserByEmail(parsed.data.email);
+      if (racedUser && !racedUser.emailVerified) {
+        return resendVerificationForUnverifiedUser(
+          racedUser.id,
+          racedUser.email,
+          passwordHash,
+        );
+      }
+
+      return {
+        success: true,
+        error: REGISTRATION_ACCOUNT_EXISTS_MESSAGE,
+        verificationEmailSent: false,
+      };
+    }
+
+    throw error;
   }
-
-  const [user] = await db
-    .insert(users)
-    .values({
-      email: parsed.data.email,
-      passwordHash,
-      emailVerified: false,
-    })
-    .returning();
-
-  if (!user) {
-    return { success: false, error: "Unable to create account." };
-  }
-
-  try {
-    const token = await createEmailVerificationToken(user.id);
-    await sendVerificationEmail(user.email, token);
-  } catch {
-    await db.delete(users).where(eq(users.id, user.id));
-    return { success: false, error: EMAIL_DELIVERY_FAILED_MESSAGE };
-  }
-
-  return {
-    success: true,
-    error: REGISTRATION_EMAIL_MESSAGE,
-    verificationEmailSent: true,
-  };
 }

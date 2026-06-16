@@ -5,5 +5,12 @@ import { env } from "@/lib/env";
 import { isLocalEnv } from "@/lib/env-schema";
 
 export async function getAuthClientIp(): Promise<string> {
-  return getRequestClientIp({ trustProxy: !isLocalEnv(env.APP_ENV) });
+  if (isLocalEnv(env.APP_ENV)) {
+    return getRequestClientIp({ trustProxy: false, localFallback: "local" });
+  }
+
+  return getRequestClientIp({
+    trustProxy: env.TRUST_PROXY_HEADERS,
+    trustedProxyCidrs: env.TRUSTED_PROXY_CIDRS,
+  });
 }

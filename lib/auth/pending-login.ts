@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, lt, sql } from "drizzle-orm";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
 
 import { pendingLogins } from "@/db/schema";
 import {
@@ -22,6 +22,24 @@ export async function purgeExpiredPendingLogins(): Promise<void> {
 
 export async function createPendingLogin(userId: string): Promise<PendingLogin> {
   await purgeExpiredPendingLogins();
+
+  const now = new Date();
+  const [existing] = await db
+    .select()
+    .from(pendingLogins)
+    .where(
+      and(
+        eq(pendingLogins.userId, userId),
+        gt(pendingLogins.expiresAt, now),
+        lt(pendingLogins.attemptCount, MAX_PENDING_LOGIN_ATTEMPTS),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    return existing;
+  }
+
   await deletePendingLoginsForUser(userId);
 
   const expiresAt = new Date(Date.now() + PENDING_LOGIN_TTL_MS);

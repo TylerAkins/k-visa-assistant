@@ -23,7 +23,7 @@ describe("middleware", () => {
     expect(response.headers.get("location")).toBe("http://localhost:3000/login");
   });
 
-  it("redirects authenticated users away from guest routes", async () => {
+  it("allows guest routes even when a signed session cookie is present", async () => {
     vi.stubEnv("SESSION_SECRET", SESSION_SECRET);
     const signed = await signSessionCookieValue(SESSION_ID, SESSION_SECRET);
     const { middleware } = await import("@/middleware");
@@ -32,10 +32,7 @@ describe("middleware", () => {
     request.cookies.set("session", signed);
     const response = await middleware(request);
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/account/settings",
-    );
+    expect(response.status).toBe(200);
   });
 
   it("clears invalid session cookies on guest routes", async () => {
@@ -48,5 +45,17 @@ describe("middleware", () => {
 
     expect(response.status).toBe(200);
     expect(response.cookies.get("session")?.value).toBe("");
+  });
+
+  it("sets referrer policy on token pages", async () => {
+    vi.stubEnv("SESSION_SECRET", SESSION_SECRET);
+    const { middleware } = await import("@/middleware");
+
+    const request = new NextRequest(
+      "http://localhost:3000/verify-email?token=abc",
+    );
+    const response = await middleware(request);
+
+    expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
   });
 });

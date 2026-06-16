@@ -26,17 +26,28 @@ import {
 import { markRecoveryCodeUsed } from "@/features/auth/services/user-repository";
 import type { ActionResult, TotpSetupResult } from "@/features/auth/types";
 import {
+  beginTotpSetupSchema,
   disableTotpSchema,
+  recoveryCodeSchema,
   regenerateRecoveryCodesSchema,
   totpCodeSchema,
 } from "@/features/auth/validation/schemas";
 
 export async function beginTotpSetupService(
+  input: Record<string, FormDataEntryValue | null>,
   clientIp: string,
 ): Promise<TotpSetupResult> {
   const authSession = await getAuthSession();
   if (!authSession) {
     return unauthorizedResult();
+  }
+
+  const parsed = beginTotpSetupSchema.safeParse({
+    password: input.password,
+  });
+
+  if (!parsed.success) {
+    return { success: false, fieldErrors: formatZodErrors(parsed.error) };
   }
 
   const rateLimit = checkAuthRateLimits("totp-setup", [
@@ -45,6 +56,25 @@ export async function beginTotpSetupService(
   ]);
   if (!rateLimit.allowed) {
     return rateLimitError(rateLimit.retryAfterSeconds);
+  }
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, authSession.user.id))
+    .limit(1);
+
+  if (!user) {
+    return unauthorizedResult();
+  }
+
+  const passwordValid = await verifyLoginPassword(
+    { passwordHash: user.passwordHash },
+    parsed.data.password,
+  );
+
+  if (!passwordValid) {
+    return { success: false, error: "Invalid email or password." };
   }
 
   const [existing] = await db
@@ -211,6 +241,14 @@ export async function disableTotpService(
     const secret = decryptTotpSecret(totp.secretEncrypted);
     codeValid = await verifyTotpCode(secret, parsed.data.code);
   } else {
+    const parsedRecovery = recoveryCodeSchema.safeParse({
+      code: parsed.data.code,
+    });
+
+    if (!parsedRecovery.success) {
+      return { success: false, error: "Invalid code." };
+    }
+
     const codes = await db
       .select()
       .from(recoveryCodes)
@@ -221,7 +259,9 @@ export async function disableTotpService(
         continue;
       }
 
-      if (await verifyRecoveryCode(entry.codeHash, parsed.data.code)) {
+      if (
+        await verifyRecoveryCode(entry.codeHash, parsedRecovery.data.code)
+      ) {
         codeValid = await markRecoveryCodeUsed(entry.id);
         break;
       }

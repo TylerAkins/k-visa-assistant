@@ -54,7 +54,7 @@ describe("cookies", () => {
         return { value: "signed.session-123.sig" };
       }
       if (name === "pending-login") {
-        return { value: "pending-123" };
+        return { value: "signed.pending-123.sig" };
       }
       return undefined;
     });
@@ -73,18 +73,20 @@ describe("cookies", () => {
 
     await clearSessionCookie();
     expect(cookieStore.delete).toHaveBeenCalledWith("session");
+    expect(cookieStore.delete).toHaveBeenCalledWith("__Host-session");
   });
 
   it("sets and clears pending login cookies", async () => {
     await setPendingLoginCookie("pending-456");
     expect(cookieStore.set).toHaveBeenCalledWith(
       "pending-login",
-      "pending-456",
+      "signed.pending-456.sig",
       expect.objectContaining({ httpOnly: true }),
     );
 
     await clearPendingLoginCookie();
     expect(cookieStore.delete).toHaveBeenCalledWith("pending-login");
+    expect(cookieStore.delete).toHaveBeenCalledWith("__Host-pending-login");
   });
 
   it("returns null when cookies are missing", async () => {
@@ -121,7 +123,7 @@ describe("cookies", () => {
   it("reads host-prefixed pending login cookies", async () => {
     cookieStore.get.mockImplementation((name: string) => {
       if (name === "__Host-pending-login") {
-        return { value: "host-pending-123" };
+        return { value: "signed.host-pending-123.sig" };
       }
       return undefined;
     });

@@ -9,7 +9,7 @@ import {
   parseEnvConfig,
 } from "@/lib/env-schema";
 
-const localConfig = {
+const localEnvInput = {
   APP_ENV: "local",
   NODE_ENV: "development",
   APP_URL: "http://localhost:3000",
@@ -19,14 +19,21 @@ const localConfig = {
   EMAIL_PROVIDER: "console",
 };
 
+const localConfig = {
+  ...localEnvInput,
+  DEV_ALLOWED_CIDRS: undefined,
+  TRUST_PROXY_HEADERS: false,
+  TRUSTED_PROXY_CIDRS: undefined,
+};
+
 describe("envSchema", () => {
   it("accepts a valid local configuration", () => {
-    expect(envSchema.safeParse(localConfig).success).toBe(true);
+    expect(envSchema.safeParse(localEnvInput).success).toBe(true);
   });
 
   it("requires NODE_ENV production for dev and prod APP_ENV", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       APP_ENV: "dev",
       NODE_ENV: "development",
     });
@@ -36,7 +43,7 @@ describe("envSchema", () => {
 
   it("rejects DEV_ALLOWED_CIDRS outside dev", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       DEV_ALLOWED_CIDRS: "203.0.113.0/24",
     });
 
@@ -108,7 +115,7 @@ describe("envSchema", () => {
 
   it("rejects non-postgres DATABASE_URL values", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       DATABASE_URL: "mysql://user:pass@127.0.0.1:3306/kvisaassistant",
     });
 
@@ -117,7 +124,7 @@ describe("envSchema", () => {
 
   it("rejects malformed DATABASE_URL values", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       DATABASE_URL: "not-a-database-url",
     });
 
@@ -126,7 +133,7 @@ describe("envSchema", () => {
 
   it("rejects secrets shorter than 32 characters", () => {
     const result = envSchema.safeParse({
-      ...localConfig,
+      ...localEnvInput,
       SESSION_SECRET: "too-short",
     });
 
@@ -153,7 +160,7 @@ describe("formatEnvErrors", () => {
 
 describe("parseEnvConfig", () => {
   it("returns parsed config when validation succeeds", () => {
-    expect(parseEnvConfig(localConfig)).toEqual(localConfig);
+    expect(parseEnvConfig(localEnvInput)).toEqual(localConfig);
   });
 
   it("throws with field names only when validation fails", () => {

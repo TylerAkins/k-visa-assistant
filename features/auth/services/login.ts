@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { recoveryCodes, totpSettings } from "@/db/schema";
 import {
-  EMAIL_NOT_VERIFIED_MESSAGE,
   LOGIN_INVALID_MESSAGE,
   MAX_PENDING_LOGIN_ATTEMPTS,
   TOTP_INVALID_MESSAGE,
@@ -78,7 +77,7 @@ export async function loginUserService(
   }
 
   if (!user.emailVerified) {
-    return { success: false, error: EMAIL_NOT_VERIFIED_MESSAGE };
+    return { success: false, error: LOGIN_INVALID_MESSAGE };
   }
 
   const [totp] = await db
@@ -127,9 +126,17 @@ export async function verifyLoginTotpService(
   const totpInput = input.code;
   const recoveryInput = input.recoveryCode;
 
+  const hasRecovery =
+    typeof recoveryInput === "string" && recoveryInput.trim().length > 0;
+  const hasTotp = typeof totpInput === "string" && totpInput.trim().length > 0;
+
+  if (hasRecovery && hasTotp) {
+    return { success: false, error: TOTP_INVALID_MESSAGE };
+  }
+
   let codeValid = false;
 
-  if (typeof recoveryInput === "string" && recoveryInput.length > 0) {
+  if (hasRecovery) {
     const parsedRecovery = recoveryCodeSchema.safeParse({
       code: recoveryInput,
     });
@@ -162,7 +169,7 @@ export async function verifyLoginTotpService(
         }
       }
     }
-  } else {
+  } else if (hasTotp) {
     const parsedTotp = totpCodeSchema.safeParse({ code: totpInput });
     if (!parsedTotp.success) {
       const attempts = await incrementPendingLoginAttempts(pendingLoginId);
@@ -170,7 +177,7 @@ export async function verifyLoginTotpService(
         await deletePendingLogin(pendingLoginId);
         await clearPendingLoginCookie();
       }
-      return { success: false, fieldErrors: formatZodErrors(parsedTotp.error) };
+      return { success: false, error: TOTP_INVALID_MESSAGE };
     }
 
     const [totp] = await db
@@ -183,6 +190,8 @@ export async function verifyLoginTotpService(
       const secret = decryptTotpSecret(totp.secretEncrypted);
       codeValid = await verifyTotpCode(secret, parsedTotp.data.code);
     }
+  } else {
+    return { success: false, error: TOTP_INVALID_MESSAGE };
   }
 
   if (!codeValid) {

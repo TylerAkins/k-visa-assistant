@@ -3,6 +3,12 @@ import "server-only";
 import { cookies } from "next/headers";
 
 import {
+  PENDING_LOGIN_COOKIE_NAME_HOST,
+  PENDING_LOGIN_COOKIE_NAME_LOCAL,
+  SESSION_COOKIE_NAME_HOST,
+  SESSION_COOKIE_NAME_LOCAL,
+} from "@/lib/auth/constants";
+import {
   buildAuthCookieOptions,
   getPendingLoginCookieMaxAge,
   getPendingLoginCookieName,
@@ -30,13 +36,14 @@ export async function setSessionCookie(sessionId: string): Promise<void> {
 
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(getSessionCookieName(env.APP_ENV));
+  cookieStore.delete(SESSION_COOKIE_NAME_LOCAL);
+  cookieStore.delete(SESSION_COOKIE_NAME_HOST);
 }
 
 export async function getSessionIdFromCookies(): Promise<string | null> {
   const cookieStore = await cookies();
-  const local = cookieStore.get("session")?.value;
-  const host = cookieStore.get("__Host-session")?.value;
+  const local = cookieStore.get(SESSION_COOKIE_NAME_LOCAL)?.value;
+  const host = cookieStore.get(SESSION_COOKIE_NAME_HOST)?.value;
   const rawValue = local ?? host ?? null;
 
   if (!rawValue) {
@@ -46,29 +53,53 @@ export async function getSessionIdFromCookies(): Promise<string | null> {
   return parseSessionCookieValue(rawValue, env.SESSION_SECRET);
 }
 
+export async function hasRawSessionCookieValue(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return Boolean(
+    cookieStore.get(SESSION_COOKIE_NAME_LOCAL)?.value ??
+      cookieStore.get(SESSION_COOKIE_NAME_HOST)?.value,
+  );
+}
+
 export async function setPendingLoginCookie(
   pendingLoginId: string,
 ): Promise<void> {
   const cookieStore = await cookies();
+  const signedValue = await signSessionCookieValue(
+    pendingLoginId,
+    env.SESSION_SECRET,
+  );
   cookieStore.set(
     getPendingLoginCookieName(env.APP_ENV),
-    pendingLoginId,
+    signedValue,
     buildAuthCookieOptions(env.APP_ENV, getPendingLoginCookieMaxAge()),
   );
 }
 
 export async function clearPendingLoginCookie(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(getPendingLoginCookieName(env.APP_ENV));
+  cookieStore.delete(PENDING_LOGIN_COOKIE_NAME_LOCAL);
+  cookieStore.delete(PENDING_LOGIN_COOKIE_NAME_HOST);
 }
 
 export async function getPendingLoginIdFromCookies(): Promise<string | null> {
   const cookieStore = await cookies();
-  const local = cookieStore.get("pending-login")?.value;
-  const host = cookieStore.get("__Host-pending-login")?.value;
-  return local ?? host ?? null;
+  const local = cookieStore.get(PENDING_LOGIN_COOKIE_NAME_LOCAL)?.value;
+  const host = cookieStore.get(PENDING_LOGIN_COOKIE_NAME_HOST)?.value;
+  const rawValue = local ?? host ?? null;
+
+  if (!rawValue) {
+    return null;
+  }
+
+  return parseSessionCookieValue(rawValue, env.SESSION_SECRET);
+}
+
+export async function clearAuthCookies(): Promise<void> {
+  await clearSessionCookie();
+  await clearPendingLoginCookie();
 }
 
 export function getSessionCookieNameForMiddleware(): string[] {
-  return ["session", "__Host-session"];
+  return [SESSION_COOKIE_NAME_LOCAL, SESSION_COOKIE_NAME_HOST];
 }

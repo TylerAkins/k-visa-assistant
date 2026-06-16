@@ -14,6 +14,11 @@ vi.mock("@/db", () => ({
     delete: vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue(undefined),
     }),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    }),
   },
 }));
 
@@ -82,6 +87,31 @@ describe("registerUserService", () => {
 
     expect(result.success).toBe(true);
     expect(result.verificationEmailSent).toBe(false);
+  });
+
+  it("updates password when re-registering an unverified account", async () => {
+    const { db } = await import("@/db");
+    vi.mocked(findUserByEmail).mockResolvedValueOnce({
+      id: "user-1",
+      email: "pending@example.com",
+      passwordHash: "old-hash",
+      emailVerified: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await registerUserService(
+      {
+        email: "pending@example.com",
+        password: "SecurePass123!",
+        confirmPassword: "SecurePass123!",
+      },
+      "127.0.0.1",
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.verificationEmailSent).toBe(true);
+    expect(db.update).toHaveBeenCalled();
   });
 
   it("returns rate limit error when exceeded", async () => {

@@ -51,7 +51,10 @@ Cookie attributes:
 - `__Host-` prefix in non-local environments
 - Value is `sessionId.HMAC-SHA256` using `SESSION_SECRET` (middleware validates signature)
 
-Client IP for rate limits uses `X-Forwarded-For` / `X-Real-IP` in non-local environments (`getAuthClientIp`).
+- Client IP for rate limits uses `X-Forwarded-For` / `X-Real-IP` in non-local environments (`getAuthClientIp`).
+- Set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` in production only when behind a reverse proxy; forwarded headers are ignored otherwise.
+- Stale signed session cookies are cleared when the DB session is missing (`getAuthSession`).
+- Guest routes no longer redirect purely on cookie signature; login page redirects when a live session exists.
 
 ## Email verification
 
@@ -102,6 +105,8 @@ In-memory per-process limits in `lib/security/auth-rate-limit.ts`:
 | Variable | Purpose |
 |----------|---------|
 | `SESSION_SECRET` | HMAC signing for session cookies (min 32 chars) |
+| `TRUST_PROXY_HEADERS` | When `true`, trust `X-Forwarded-For` only from `TRUSTED_PROXY_CIDRS` |
+| `TRUSTED_PROXY_CIDRS` | Comma-separated IPv4 CIDRs for trusted reverse proxies |
 | `ENCRYPTION_KEY` | TOTP secret encryption at rest (min 32 chars) |
 | `EMAIL_PROVIDER` | `console` (default) or future providers |
 

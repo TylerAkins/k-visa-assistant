@@ -36,6 +36,12 @@ export const envSchema = z
     ENCRYPTION_KEY: secretSchema,
     EMAIL_PROVIDER: z.enum(emailProviders).default("console"),
     DEV_ALLOWED_CIDRS: z.string().optional(),
+    TRUST_PROXY_HEADERS: z
+      .enum(["true", "false"])
+      .optional()
+      .default("false")
+      .transform((value) => value === "true"),
+    TRUSTED_PROXY_CIDRS: z.string().optional(),
   })
   .superRefine((data, context) => {
     if (
@@ -66,6 +72,24 @@ export const envSchema = z
         });
       }
     }
+
+    if (data.TRUST_PROXY_HEADERS && !data.TRUSTED_PROXY_CIDRS) {
+      context.addIssue({
+        code: "custom",
+        path: ["TRUSTED_PROXY_CIDRS"],
+        message:
+          "TRUSTED_PROXY_CIDRS is required when TRUST_PROXY_HEADERS is true",
+      });
+    }
+
+    if (data.TRUSTED_PROXY_CIDRS && !isValidCidrList(data.TRUSTED_PROXY_CIDRS)) {
+      context.addIssue({
+        code: "custom",
+        path: ["TRUSTED_PROXY_CIDRS"],
+        message:
+          "TRUSTED_PROXY_CIDRS must be a comma-separated list of IPv4 CIDRs",
+      });
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;
@@ -95,6 +119,8 @@ export function parseEnvConfig(
     ENCRYPTION_KEY: config.ENCRYPTION_KEY,
     EMAIL_PROVIDER: config.EMAIL_PROVIDER,
     DEV_ALLOWED_CIDRS: config.DEV_ALLOWED_CIDRS,
+    TRUST_PROXY_HEADERS: config.TRUST_PROXY_HEADERS,
+    TRUSTED_PROXY_CIDRS: config.TRUSTED_PROXY_CIDRS,
   });
 
   if (!result.success) {

@@ -123,7 +123,7 @@ describe("loginUserService", () => {
       "127.0.0.1",
     );
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Verify your email before signing in.");
+    expect(result.error).toBe("Invalid email or password.");
   });
 
   it("returns redirect target when password is valid and totp disabled", async () => {
@@ -290,7 +290,7 @@ describe("verifyLoginTotpService", () => {
     expect(result.success).toBe(false);
   });
 
-  it("returns field errors for invalid totp format", async () => {
+  it("returns invalid code for malformed totp input", async () => {
     vi.mocked(getPendingLoginIdFromCookies).mockResolvedValue("pending-1");
     vi.mocked(getPendingLogin).mockResolvedValue({
       id: "pending-1",
@@ -302,7 +302,7 @@ describe("verifyLoginTotpService", () => {
 
     const result = await verifyLoginTotpService({ code: "abc" }, "127.0.0.1");
     expect(result.success).toBe(false);
-    expect(result.fieldErrors).toBeDefined();
+    expect(result.error).toBe("Invalid code.");
   });
 
   it("skips used recovery codes when validating", async () => {

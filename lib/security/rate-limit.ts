@@ -53,6 +53,14 @@ function enforceMaxBuckets(): void {
   }
 
   if (buckets.size > MAX_BUCKETS) {
+    const authEntries = [...buckets.entries()].filter(([key]) =>
+      key.startsWith("auth:"),
+    );
+    if (authEntries.length > 0 && process.env.NODE_ENV !== "test") {
+      console.warn(
+        `[rate-limit] Evicting auth buckets after non-auth eviction (${authEntries.length} auth buckets remain before eviction)`,
+      );
+    }
     evictOldest([...buckets.entries()]);
   }
 }

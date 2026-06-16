@@ -22,6 +22,8 @@ function stubBaseEnv() {
   process.env.ENCRYPTION_KEY = baseEnv.ENCRYPTION_KEY;
   process.env.EMAIL_PROVIDER = baseEnv.EMAIL_PROVIDER;
   delete process.env.DEV_ALLOWED_CIDRS;
+  delete process.env.TRUST_PROXY_HEADERS;
+  delete process.env.TRUSTED_PROXY_CIDRS;
 }
 
 describe("lib/env", () => {

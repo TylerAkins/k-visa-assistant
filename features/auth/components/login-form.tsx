@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export function LoginForm({ initialRequiresTotp = false }: LoginFormProps) {
     verifyLoginTotp,
     initialState,
   );
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false);
 
   const requiresTotp = loginState.requiresTotp || totpState.requiresTotp;
   const state = requiresTotp ? totpState : loginState;
@@ -47,25 +48,48 @@ export function LoginForm({ initialRequiresTotp = false }: LoginFormProps) {
           <FormMessage message={state.fieldErrors.recoveryCode[0]} />
         ) : null}
         <form action={totpAction} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="code">Authenticator code</Label>
-            <Input
-              id="code"
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="123456"
-            />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={useRecoveryCode ? "outline" : "default"}
+              size="sm"
+              onClick={() => setUseRecoveryCode(false)}
+            >
+              Authenticator code
+            </Button>
+            <Button
+              type="button"
+              variant={useRecoveryCode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setUseRecoveryCode(true)}
+            >
+              Recovery code
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="recoveryCode">Recovery code (optional)</Label>
-            <Input
-              id="recoveryCode"
-              name="recoveryCode"
-              autoComplete="off"
-              placeholder="a1b2c3d4-e5f67890"
-            />
-          </div>
+          {useRecoveryCode ? (
+            <div className="space-y-2">
+              <Label htmlFor="recoveryCode">Recovery code</Label>
+              <Input
+                id="recoveryCode"
+                name="recoveryCode"
+                autoComplete="off"
+                placeholder="a1b2c3d4-e5f67890"
+                required
+              />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="code">Authenticator code</Label>
+              <Input
+                id="code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                required
+              />
+            </div>
+          )}
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Verifying..." : "Continue"}
           </Button>
