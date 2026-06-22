@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AuthCard } from "@/features/auth/components/auth-card";
@@ -29,7 +29,9 @@ export function VerifyEmailForm({ token }: VerifyEmailFormProps) {
     submittedTokens.add(token);
     const formData = new FormData();
     formData.set("token", token);
-    action(formData);
+    startTransition(() => {
+      action(formData);
+    });
   }, [token, action]);
 
   const handleRetry = () => {
@@ -39,7 +41,9 @@ export function VerifyEmailForm({ token }: VerifyEmailFormProps) {
 
     const formData = new FormData();
     formData.set("token", token);
-    action(formData);
+    startTransition(() => {
+      action(formData);
+    });
   };
 
   return (
