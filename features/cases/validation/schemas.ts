@@ -8,7 +8,10 @@ const optionalText = z
   .or(z.literal(""))
   .transform((value) => (value ? value : undefined));
 
-const personName = z.string().trim().min(1).max(80);
+const draftName = z.string().trim().max(80);
+const draftAddressLine = z.string().trim().max(120);
+const draftShortText = z.string().trim().max(80);
+const draftPostalCode = z.string().trim().max(20);
 const blankToUndefined = (value: unknown) => (value === "" ? undefined : value);
 const dateString = z.preprocess(
   blankToUndefined,
@@ -25,46 +28,46 @@ export const caseTitleSchema = z.object({
 });
 
 export const petitionerSchema = z.object({
-  firstName: personName,
+  firstName: draftName,
   middleName: optionalText,
-  lastName: personName,
+  lastName: draftName,
   dateOfBirth: dateString,
   countryOfBirth: optionalText,
   citizenship: optionalText,
   email,
   phone,
-  street1: z.string().trim().min(1).max(120),
+  street1: draftAddressLine,
   street2: optionalText,
-  city: z.string().trim().min(1).max(80),
+  city: draftShortText,
   state: optionalText,
-  postalCode: z.string().trim().min(1).max(20),
-  country: z.string().trim().min(1).max(80),
+  postalCode: draftPostalCode,
+  country: draftShortText,
 });
 
 export const beneficiarySchema = z.object({
-  firstName: personName,
+  firstName: draftName,
   middleName: optionalText,
-  lastName: personName,
+  lastName: draftName,
   dateOfBirth: dateString,
   countryOfBirth: optionalText,
   citizenship: optionalText,
   email,
   phone,
-  street1: z.string().trim().min(1).max(120),
+  street1: draftAddressLine,
   street2: optionalText,
-  city: z.string().trim().min(1).max(80),
+  city: draftShortText,
   province: optionalText,
-  postalCode: z.string().trim().min(1).max(20),
-  country: z.string().trim().min(1).max(80),
+  postalCode: draftPostalCode,
+  country: draftShortText,
 });
 
 export const childSchema = z.object({
-  firstName: personName,
+  firstName: draftName,
   middleName: optionalText,
-  lastName: personName,
+  lastName: draftName,
   dateOfBirth: dateString,
   citizenship: optionalText,
-  relationshipType: z.string().trim().min(1).max(40),
+  relationshipType: z.string().trim().max(40),
 });
 
 export type CaseTitleInput = z.infer<typeof caseTitleSchema>;

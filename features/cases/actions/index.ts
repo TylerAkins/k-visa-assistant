@@ -5,9 +5,8 @@ import { redirect } from "next/navigation";
 
 import { assertCaseOwnership, createCase } from "@/features/cases/server/cases";
 import {
-  addChild,
-  markChildrenReviewed,
   saveBeneficiary,
+  saveChildren,
   savePetitioner,
   updateCaseTitle,
 } from "@/features/cases/server/forms";
@@ -28,7 +27,6 @@ export async function createCaseAction(formData: FormData) {
 export async function updateCaseTitleAction(caseId: string, formData: FormData) {
   await assertCaseOwnership(caseId);
   const result = await updateCaseTitle(caseId, formData);
-  revalidatePath(`/cases/${caseId}`);
   revalidatePath("/dashboard");
   return result;
 }
@@ -36,7 +34,6 @@ export async function updateCaseTitleAction(caseId: string, formData: FormData) 
 export async function savePetitionerAction(caseId: string, formData: FormData) {
   await assertCaseOwnership(caseId);
   const result = await savePetitioner(caseId, formData);
-  revalidatePath(`/cases/${caseId}`);
   revalidatePath("/dashboard");
   return result;
 }
@@ -44,23 +41,13 @@ export async function savePetitionerAction(caseId: string, formData: FormData) {
 export async function saveBeneficiaryAction(caseId: string, formData: FormData) {
   await assertCaseOwnership(caseId);
   const result = await saveBeneficiary(caseId, formData);
-  revalidatePath(`/cases/${caseId}`);
   revalidatePath("/dashboard");
   return result;
 }
 
-export async function addChildAction(caseId: string, formData: FormData) {
+export async function saveChildrenAction(caseId: string, formData: FormData) {
   await assertCaseOwnership(caseId);
-  const result = await addChild(caseId, formData);
-  revalidatePath(`/cases/${caseId}`);
-  revalidatePath("/dashboard");
-  return result;
-}
-
-export async function markChildrenReviewedAction(caseId: string) {
-  await assertCaseOwnership(caseId);
-  const result = await markChildrenReviewed(caseId);
-  revalidatePath(`/cases/${caseId}`);
+  const result = await saveChildren(caseId, formData);
   revalidatePath("/dashboard");
   return result;
 }

@@ -29,7 +29,9 @@ export function DashboardCaseCards({
                 />
               </div>
               <p className="text-sm text-muted-foreground">
-                {caseItem.progressPercent}% complete
+                {caseItem.progressPercent === 0
+                  ? "Not started"
+                  : `${caseItem.progressPercent}% complete`}
               </p>
             </div>
             <Link href={`/cases/${caseItem.id}`}>
@@ -43,4 +45,3 @@ export function DashboardCaseCards({
     </div>
   );
 }
-

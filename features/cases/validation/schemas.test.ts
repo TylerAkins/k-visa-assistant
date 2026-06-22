@@ -12,25 +12,29 @@ describe("case validation schemas", () => {
     expect(caseTitleSchema.safeParse({ title: "Tyler & Van" }).success).toBe(true);
   });
 
-  it("rejects an empty petitioner name", () => {
-    expect(
-      petitionerSchema.safeParse({
-        firstName: "",
-        middleName: "",
-        lastName: "Akins",
-        dateOfBirth: "1990-01-01",
-        countryOfBirth: "United States",
-        citizenship: "United States",
-        email: "tyler@example.com",
-        phone: "",
-        street1: "123 Main St",
-        street2: "",
-        city: "Austin",
-        state: "TX",
-        postalCode: "78701",
-        country: "United States",
-      }).success,
-    ).toBe(false);
+  it("allows draft petitioner fields to be blank", () => {
+    const result = petitionerSchema.safeParse({
+      firstName: "",
+      middleName: "",
+      lastName: "Akins",
+      dateOfBirth: "1990-01-01",
+      countryOfBirth: "United States",
+      citizenship: "United States",
+      email: "tyler@example.com",
+      phone: "",
+      street1: "",
+      street2: "",
+      city: "",
+      state: "TX",
+      postalCode: "",
+      country: "",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.firstName).toBe("");
+      expect(result.data.street1).toBe("");
+    }
   });
 
   it("validates beneficiary contact and address fields", () => {

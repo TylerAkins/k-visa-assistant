@@ -22,11 +22,11 @@
 
 ## Progress Calculation
 
-- Case creation starts at 10 percent.
+- Case creation starts at 0 percent.
 - Completing petitioner details adds 30 percent.
 - Completing beneficiary details adds 30 percent.
 - Reviewing children adds 10 percent.
-- Reaching the questionnaire-ready state adds 20 percent.
+- Reaching the questionnaire-ready state adds 30 percent.
 - `features/cases/server/progress.ts` owns the calculation so future phases can extend it in one place.
 
 ## Future Expansion Strategy

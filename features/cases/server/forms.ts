@@ -29,16 +29,6 @@ export async function updateCaseTitle(caseId: string, input: FormData) {
   return { success: true };
 }
 
-export async function markChildrenReviewed(caseId: string) {
-  await db
-    .update(cases)
-    .set({ childrenReviewed: true, updatedAt: new Date() })
-    .where(eq(cases.id, caseId));
-
-  await updateCaseProgress(caseId);
-  return { success: true };
-}
-
 async function upsertSinglePerson(
   table: typeof petitioners | typeof beneficiaries,
   caseId: string,
@@ -82,18 +72,59 @@ export async function saveBeneficiary(caseId: string, formData: FormData) {
   return upsertSinglePerson(beneficiaries, caseId, formData);
 }
 
-export async function addChild(caseId: string, formData: FormData) {
-  const parsed = childSchema.safeParse(Object.fromEntries(formData.entries()));
+export async function saveChildren(caseId: string, formData: FormData) {
+  const hasChildren = formData.get("hasChildren") === "yes";
 
-  if (!parsed.success) {
-    return { success: false, error: "Please fix the highlighted fields." };
+  if (!hasChildren) {
+    await db.delete(k2Children).where(eq(k2Children.caseId, caseId));
+    await db
+      .update(cases)
+      .set({ childrenReviewed: true, updatedAt: new Date() })
+      .where(eq(cases.id, caseId));
+
+    await updateCaseProgress(caseId);
+    return { success: true };
   }
 
-  await db.insert(k2Children).values({
-    caseId,
-    ...parsed.data,
-    dateOfBirth: parsed.data.dateOfBirth ? new Date(parsed.data.dateOfBirth) : null,
-    updatedAt: new Date(),
+  const childCount = Number(formData.get("childCount") ?? 0);
+
+  if (!Number.isInteger(childCount) || childCount < 1 || childCount > 10) {
+    return { success: false, error: "Select how many K-2 children to add." };
+  }
+
+  const parsedChildren = Array.from({ length: childCount }, (_, index) =>
+    childSchema.safeParse({
+      firstName: formData.get(`children.${index}.firstName`),
+      middleName: formData.get(`children.${index}.middleName`),
+      lastName: formData.get(`children.${index}.lastName`),
+      dateOfBirth: formData.get(`children.${index}.dateOfBirth`),
+      citizenship: formData.get(`children.${index}.citizenship`),
+      relationshipType: formData.get(`children.${index}.relationshipType`),
+    }),
+  );
+
+  if (parsedChildren.some((parsed) => !parsed.success)) {
+    return { success: false, error: "Please complete each K-2 child record." };
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(k2Children).where(eq(k2Children.caseId, caseId));
+    await tx.insert(k2Children).values(
+      parsedChildren.map((parsed) => {
+        if (!parsed.success) {
+          throw new Error("Invalid child record.");
+        }
+
+        return {
+          caseId,
+          ...parsed.data,
+          dateOfBirth: parsed.data.dateOfBirth
+            ? new Date(parsed.data.dateOfBirth)
+            : null,
+          updatedAt: new Date(),
+        };
+      }),
+    );
   });
 
   await db

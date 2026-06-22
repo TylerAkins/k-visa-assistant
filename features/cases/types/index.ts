@@ -39,8 +39,10 @@ export type CaseOverviewData = {
 export type ProgressState = {
   hasPetitioner: boolean;
   petitionerComplete: boolean;
+  petitionerCompletionRatio: number;
   hasBeneficiary: boolean;
   beneficiaryComplete: boolean;
+  beneficiaryCompletionRatio: number;
   hasChildren: boolean;
   childrenReviewed: boolean;
   readyForQuestionnaire: boolean;

@@ -9,9 +9,8 @@ import {
   PersonForm,
 } from "@/features/cases/components/forms";
 import {
-  addChildAction,
-  markChildrenReviewedAction,
   saveBeneficiaryAction,
+  saveChildrenAction,
   savePetitionerAction,
   updateCaseTitleAction,
 } from "@/features/cases/actions";
@@ -36,7 +35,11 @@ export default async function CaseOverviewPage({
           <div className="flex flex-wrap items-center gap-3">
             <CardTitle className="text-2xl">{overview.case.title}</CardTitle>
             <Badge variant="secondary">{overview.case.status}</Badge>
-            <Badge>{overview.case.progressPercent}% complete</Badge>
+            <Badge>
+              {overview.case.progressPercent === 0
+                ? "Not started"
+                : `${overview.case.progressPercent}% complete`}
+            </Badge>
           </div>
           <CaseTitleForm
             caseId={overview.case.id}
@@ -66,9 +69,7 @@ export default async function CaseOverviewPage({
       <ChildForm
         caseId={overview.case.id}
         childRecords={overview.children}
-        childrenReviewed={overview.case.childrenReviewed}
-        addAction={addChildAction}
-        reviewAction={markChildrenReviewedAction}
+        saveAction={saveChildrenAction}
       />
       <FutureFeaturePlaceholders />
     </div>

@@ -1,6 +1,6 @@
 {
-  "id": "f32f7856-2d77-40bc-8cee-c941d99401b9",
-  "prevId": "34d2104a-42c1-4433-a8d4-6fd2329cd609",
+  "id": "6f3c7154-3f70-4db9-af0b-a981de803c60",
+  "prevId": "f32f7856-2d77-40bc-8cee-c941d99401b9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -193,7 +193,7 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": 10
+          "default": 0
         },
         "children_reviewed": {
           "name": "children_reviewed",

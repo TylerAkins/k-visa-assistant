@@ -83,6 +83,11 @@ export async function getCaseOverview(caseId: string) {
       ? {
           firstName: petitioner.firstName,
           lastName: petitioner.lastName,
+          dateOfBirth: petitioner.dateOfBirth,
+          countryOfBirth: petitioner.countryOfBirth,
+          citizenship: petitioner.citizenship,
+          email: petitioner.email,
+          phone: petitioner.phone,
           street1: petitioner.street1,
           city: petitioner.city,
           postalCode: petitioner.postalCode,
@@ -93,6 +98,11 @@ export async function getCaseOverview(caseId: string) {
       ? {
           firstName: beneficiary.firstName,
           lastName: beneficiary.lastName,
+          dateOfBirth: beneficiary.dateOfBirth,
+          countryOfBirth: beneficiary.countryOfBirth,
+          citizenship: beneficiary.citizenship,
+          email: beneficiary.email,
+          phone: beneficiary.phone,
           street1: beneficiary.street1,
           city: beneficiary.city,
           postalCode: beneficiary.postalCode,
@@ -123,7 +133,7 @@ export async function createCase(userId: string, title: string) {
       userId,
       title,
       status: "draft",
-      progressPercent: 10,
+      progressPercent: 0,
     })
     .returning();
 
@@ -139,6 +149,11 @@ export async function updateCaseProgress(caseId: string) {
         ? {
             firstName: overview.petitioner.firstName,
             lastName: overview.petitioner.lastName,
+            dateOfBirth: overview.petitioner.dateOfBirth,
+            countryOfBirth: overview.petitioner.countryOfBirth,
+            citizenship: overview.petitioner.citizenship,
+            email: overview.petitioner.email,
+            phone: overview.petitioner.phone,
             street1: overview.petitioner.street1,
             city: overview.petitioner.city,
             postalCode: overview.petitioner.postalCode,
@@ -149,6 +164,11 @@ export async function updateCaseProgress(caseId: string) {
         ? {
             firstName: overview.beneficiary.firstName,
             lastName: overview.beneficiary.lastName,
+            dateOfBirth: overview.beneficiary.dateOfBirth,
+            countryOfBirth: overview.beneficiary.countryOfBirth,
+            citizenship: overview.beneficiary.citizenship,
+            email: overview.beneficiary.email,
+            phone: overview.beneficiary.phone,
             street1: overview.beneficiary.street1,
             city: overview.beneficiary.city,
             postalCode: overview.beneficiary.postalCode,

@@ -140,7 +140,7 @@ export const cases = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     status: text("status").notNull().default("draft"),
-    progressPercent: integer("progress_percent").notNull().default(10),
+    progressPercent: integer("progress_percent").notNull().default(0),
     childrenReviewed: boolean("children_reviewed").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
