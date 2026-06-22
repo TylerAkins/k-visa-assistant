@@ -26,7 +26,8 @@ export async function updateCaseTitle(caseId: string, input: FormData) {
     .set({ title: parsed.data.title, updatedAt: new Date() })
     .where(eq(cases.id, caseId));
 
-  return { success: true };
+  const caseRecord = await updateCaseProgress(caseId);
+  return { success: true, progressPercent: caseRecord.progressPercent };
 }
 
 async function upsertSinglePerson(
@@ -60,8 +61,8 @@ async function upsertSinglePerson(
     await db.insert(table).values(values);
   }
 
-  await updateCaseProgress(caseId);
-  return { success: true };
+  const caseRecord = await updateCaseProgress(caseId);
+  return { success: true, progressPercent: caseRecord.progressPercent };
 }
 
 export async function savePetitioner(caseId: string, formData: FormData) {
@@ -82,8 +83,8 @@ export async function saveChildren(caseId: string, formData: FormData) {
       .set({ childrenReviewed: true, updatedAt: new Date() })
       .where(eq(cases.id, caseId));
 
-    await updateCaseProgress(caseId);
-    return { success: true };
+    const caseRecord = await updateCaseProgress(caseId);
+    return { success: true, progressPercent: caseRecord.progressPercent };
   }
 
   const childCount = Number(formData.get("childCount") ?? 0);
@@ -132,6 +133,6 @@ export async function saveChildren(caseId: string, formData: FormData) {
     .set({ childrenReviewed: true, updatedAt: new Date() })
     .where(eq(cases.id, caseId));
 
-  await updateCaseProgress(caseId);
-  return { success: true };
+  const caseRecord = await updateCaseProgress(caseId);
+  return { success: true, progressPercent: caseRecord.progressPercent };
 }

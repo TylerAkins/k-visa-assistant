@@ -15,8 +15,18 @@ export type PersonSummary = {
   firstName: string;
   middleName: string | null;
   lastName: string;
+  dateOfBirth: Date | null;
+  countryOfBirth: string | null;
+  citizenship: string | null;
   email: string | null;
   phone: string | null;
+  street1: string | null;
+  street2: string | null;
+  city: string | null;
+  state?: string | null;
+  province?: string | null;
+  postalCode: string | null;
+  country: string | null;
 };
 
 export type ChildSummary = {

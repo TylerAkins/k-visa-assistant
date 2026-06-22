@@ -4,17 +4,20 @@ import type { ChangeEventHandler, FocusEvent, RefObject } from "react";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormMessage } from "@/features/auth/components/form-message";
+import type { CaseOverviewData } from "@/features/cases/types";
 import { kVisaCountryOptions } from "@/features/cases/types/k-visa-countries";
 import { cn } from "@/lib/utils";
 
 type CaseActionState = {
   success: boolean;
   error?: string;
+  progressPercent?: number;
 };
 
 type FormAction = (payload: FormData) => void;
@@ -48,6 +51,16 @@ type ChildFormValues = {
 };
 
 const relationshipOptions = ["Child", "Stepchild", "Adopted child"];
+
+function ProgressBadge({ progressPercent }: { progressPercent: number }) {
+  return (
+    <Badge>
+      {progressPercent === 0
+        ? "Not started"
+        : `${progressPercent}% complete`}
+    </Badge>
+  );
+}
 
 function formatDateInput(date: Date | null | undefined) {
   return date ? date.toISOString().slice(0, 10) : "";
@@ -117,14 +130,93 @@ function EmptyStateCard({
   );
 }
 
+export function CaseEditor({
+  overview,
+  updateCaseTitleAction,
+  savePetitionerAction,
+  saveBeneficiaryAction,
+  saveChildrenAction,
+}: {
+  overview: CaseOverviewData;
+  updateCaseTitleAction: (
+    caseId: string,
+    formData: FormData,
+  ) => Promise<CaseActionState>;
+  savePetitionerAction: (
+    caseId: string,
+    formData: FormData,
+  ) => Promise<CaseActionState>;
+  saveBeneficiaryAction: (
+    caseId: string,
+    formData: FormData,
+  ) => Promise<CaseActionState>;
+  saveChildrenAction: (
+    caseId: string,
+    formData: FormData,
+  ) => Promise<CaseActionState>;
+}) {
+  const [progressPercent, setProgressPercent] = useState(
+    overview.case.progressPercent,
+  );
+
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10">
+      <Card className="bg-card/80">
+        <CardHeader className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <CardTitle className="text-2xl">{overview.case.title}</CardTitle>
+            <Badge variant="secondary">{overview.case.status}</Badge>
+            <ProgressBadge progressPercent={progressPercent} />
+          </div>
+          <CaseTitleForm
+            caseId={overview.case.id}
+            title={overview.case.title}
+            action={updateCaseTitleAction}
+            onProgressChange={setProgressPercent}
+          />
+        </CardHeader>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <PersonForm
+          caseId={overview.case.id}
+          title="Petitioner"
+          description="Enter the U.S. citizen or lawful permanent resident petitioner details."
+          values={overview.petitioner}
+          action={savePetitionerAction}
+          onProgressChange={setProgressPercent}
+        />
+        <PersonForm
+          caseId={overview.case.id}
+          title="Beneficiary"
+          description="Enter the fiance(e) details for the K-1 case."
+          values={overview.beneficiary}
+          action={saveBeneficiaryAction}
+          onProgressChange={setProgressPercent}
+        />
+      </div>
+
+      <ChildForm
+        caseId={overview.case.id}
+        childRecords={overview.children}
+        saveAction={saveChildrenAction}
+        onProgressChange={setProgressPercent}
+      />
+      <FutureFeaturePlaceholders />
+    </div>
+  );
+}
+
 export function CaseTitleForm({
   caseId,
   title,
   action,
+  onProgressChange,
 }: {
   caseId: string;
   title: string;
   action: (caseId: string, formData: FormData) => Promise<CaseActionState>;
+  onProgressChange?: (progressPercent: number) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [titleValue, setTitleValue] = useState(title);
@@ -135,6 +227,9 @@ export function CaseTitleForm({
 
       if (result.success) {
         setLastSavedAt(new Date());
+        if (typeof result.progressPercent === "number") {
+          onProgressChange?.(result.progressPercent);
+        }
       }
 
       return result;
@@ -195,12 +290,14 @@ export function PersonForm({
   description,
   values,
   action,
+  onProgressChange,
 }: {
   caseId: string;
   title: string;
   description: string;
   values: PersonFormValues | null;
   action: (caseId: string, formData: FormData) => Promise<CaseActionState>;
+  onProgressChange?: (progressPercent: number) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -210,6 +307,9 @@ export function PersonForm({
 
       if (result.success) {
         setLastSavedAt(new Date());
+        if (typeof result.progressPercent === "number") {
+          onProgressChange?.(result.progressPercent);
+        }
       }
 
       return result;
@@ -344,10 +444,12 @@ export function ChildForm({
   caseId,
   childRecords,
   saveAction,
+  onProgressChange,
 }: {
   caseId: string;
   childRecords: ChildFormValues[];
   saveAction: (caseId: string, formData: FormData) => Promise<CaseActionState>;
+  onProgressChange?: (progressPercent: number) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const initialEnabled = childRecords.length > 0 ? "yes" : "no";
@@ -360,6 +462,9 @@ export function ChildForm({
 
       if (result.success) {
         setLastSavedAt(new Date());
+        if (typeof result.progressPercent === "number") {
+          onProgressChange?.(result.progressPercent);
+        }
       }
 
       return result;

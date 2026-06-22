@@ -3,21 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { assertCaseOwnership, createCase } from "@/features/cases/server/cases";
+import {
+  assertCaseOwnership,
+  createCase,
+  requireVerifiedUser,
+} from "@/features/cases/server/cases";
 import {
   saveBeneficiary,
   saveChildren,
   savePetitioner,
   updateCaseTitle,
 } from "@/features/cases/server/forms";
-import { getCurrentUser } from "@/features/auth/server/session";
 
 export async function createCaseAction(formData: FormData) {
-  const user = await getCurrentUser();
-  if (!user) {
-    throw new Error("Unauthorized");
-  }
-
+  const user = await requireVerifiedUser();
   const title = String(formData.get("title") ?? "").trim();
   const caseRecord = await createCase(user.id, title || "Untitled case");
   revalidatePath("/dashboard");

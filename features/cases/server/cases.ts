@@ -18,9 +18,7 @@ function notFoundOrUnauthorized(): never {
 }
 
 export async function assertCaseOwnership(caseId: string) {
-  const user = await getCurrentUser();
-  if (!user) notFoundOrUnauthorized();
-
+  const user = await requireVerifiedUser();
   const [record] = await db
     .select({ id: cases.id, userId: cases.userId })
     .from(cases)
@@ -31,9 +29,19 @@ export async function assertCaseOwnership(caseId: string) {
   return record;
 }
 
-export async function listUserCases() {
+export async function requireVerifiedUser() {
   const user = await getCurrentUser();
-  if (!user) return [];
+  if (!user) notFoundOrUnauthorized();
+
+  if (!user.emailVerified) {
+    notFoundOrUnauthorized();
+  }
+
+  return user;
+}
+
+export async function listUserCases() {
+  const user = await requireVerifiedUser();
 
   const rows = await db
     .select()
@@ -119,7 +127,7 @@ export async function getCaseOverview(caseId: string) {
       : calculateCaseProgress(progressState);
 
   return {
-    case: { ...caseRecord, progressPercent },
+    case: { ...caseRecord, status: caseRecord.status as CaseStatus, progressPercent },
     petitioner: petitioner ?? null,
     beneficiary: beneficiary ?? null,
     children,
