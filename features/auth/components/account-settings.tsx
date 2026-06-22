@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useActionState, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,11 +31,10 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [beginTotpError, setBeginTotpError] = useState<string | null>(null);
   const [setupPassword, setSetupPassword] = useState("");
   const [resendState, resendAction, resendPending] = useActionState(
-    async (_prev: ActionResult) => resendVerificationEmail(),
+    async () => resendVerificationEmail(),
     initialActionState,
   );
   const [confirmState, confirmAction, confirmPending] = useActionState(
@@ -73,19 +73,7 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
   };
 
   const displayedRecoveryCodes =
-    recoveryCodes ?? confirmState.recoveryCodes ?? regenState.recoveryCodes;
-
-  useEffect(() => {
-    if (confirmState.recoveryCodes) {
-      setRecoveryCodes(confirmState.recoveryCodes);
-    }
-  }, [confirmState.recoveryCodes]);
-
-  useEffect(() => {
-    if (regenState.recoveryCodes) {
-      setRecoveryCodes(regenState.recoveryCodes);
-    }
-  }, [regenState.recoveryCodes]);
+    regenState.recoveryCodes ?? confirmState.recoveryCodes;
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
@@ -154,9 +142,12 @@ export function AccountSettings({ user, totpEnabled }: AccountSettingsProps) {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <img
+                  <Image
                     src={qrDataUrl}
                     alt="TOTP QR code"
+                    width={192}
+                    height={192}
+                    unoptimized
                     className="mx-auto size-48 rounded-lg border border-border bg-white p-2"
                   />
                   <FormMessage message={confirmState.error} />

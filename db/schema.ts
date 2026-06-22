@@ -131,6 +131,114 @@ export const recoveryCodes = pgTable(
   (table) => [index("recovery_codes_user_id_idx").on(table.userId)],
 );
 
+export const cases = pgTable(
+  "cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: text("status").notNull().default("draft"),
+    progressPercent: integer("progress_percent").notNull().default(10),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("cases_user_id_idx").on(table.userId),
+    index("cases_status_idx").on(table.status),
+  ],
+);
+
+export const petitioners = pgTable(
+  "petitioners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "cascade" }),
+    firstName: text("first_name").notNull(),
+    middleName: text("middle_name"),
+    lastName: text("last_name").notNull(),
+    dateOfBirth: timestamp("date_of_birth", { withTimezone: false }),
+    countryOfBirth: text("country_of_birth"),
+    citizenship: text("citizenship"),
+    email: text("email"),
+    phone: text("phone"),
+    street1: text("street1"),
+    street2: text("street2"),
+    city: text("city"),
+    state: text("state"),
+    postalCode: text("postal_code"),
+    country: text("country"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("petitioners_case_id_idx").on(table.caseId)],
+);
+
+export const beneficiaries = pgTable(
+  "beneficiaries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "cascade" }),
+    firstName: text("first_name").notNull(),
+    middleName: text("middle_name"),
+    lastName: text("last_name").notNull(),
+    dateOfBirth: timestamp("date_of_birth", { withTimezone: false }),
+    countryOfBirth: text("country_of_birth"),
+    citizenship: text("citizenship"),
+    email: text("email"),
+    phone: text("phone"),
+    street1: text("street1"),
+    street2: text("street2"),
+    city: text("city"),
+    province: text("province"),
+    postalCode: text("postal_code"),
+    country: text("country"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("beneficiaries_case_id_idx").on(table.caseId)],
+);
+
+export const k2Children = pgTable(
+  "k2_children",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "cascade" }),
+    firstName: text("first_name").notNull(),
+    middleName: text("middle_name"),
+    lastName: text("last_name").notNull(),
+    dateOfBirth: timestamp("date_of_birth", { withTimezone: false }),
+    citizenship: text("citizenship"),
+    relationshipType: text("relationship_type").notNull().default("child"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("k2_children_case_id_idx").on(table.caseId)],
+);
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   sessions: many(sessions),
   pendingLogins: many(pendingLogins),
@@ -177,4 +285,23 @@ export const recoveryCodesRelations = relations(recoveryCodes, ({ one }) => ({
     fields: [recoveryCodes.userId],
     references: [users.id],
   }),
+}));
+
+export const casesRelations = relations(cases, ({ one, many }) => ({
+  user: one(users, { fields: [cases.userId], references: [users.id] }),
+  petitioner: one(petitioners),
+  beneficiary: one(beneficiaries),
+  children: many(k2Children),
+}));
+
+export const petitionersRelations = relations(petitioners, ({ one }) => ({
+  case: one(cases, { fields: [petitioners.caseId], references: [cases.id] }),
+}));
+
+export const beneficiariesRelations = relations(beneficiaries, ({ one }) => ({
+  case: one(cases, { fields: [beneficiaries.caseId], references: [cases.id] }),
+}));
+
+export const k2ChildrenRelations = relations(k2Children, ({ one }) => ({
+  case: one(cases, { fields: [k2Children.caseId], references: [cases.id] }),
 }));

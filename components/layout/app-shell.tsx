@@ -1,8 +1,9 @@
 import Link from "next/link";
 
 import { SiteLogo } from "@/components/layout/site-logo";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { SessionUser } from "@/features/auth/types";
+import { cn } from "@/lib/utils";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -19,16 +20,15 @@ export function AppShell({ children, user = null }: AppShellProps) {
             className="flex items-center gap-1 text-sm"
             aria-label="Main"
           >
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled
-              className="text-muted-foreground"
-              title="Available after Phase 2"
+            <Link
+              href="/dashboard"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "text-muted-foreground",
+              )}
             >
               Dashboard
-            </Button>
+            </Link>
             {user ? (
               <Link href="/account/settings">
                 <Button
