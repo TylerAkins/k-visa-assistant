@@ -54,6 +54,31 @@ describe("case validation schemas", () => {
     ).toBe(true);
   });
 
+  it("allows blank optional date and email fields from browser forms", () => {
+    const result = petitionerSchema.safeParse({
+      firstName: "Tyler",
+      middleName: "",
+      lastName: "Akins",
+      dateOfBirth: "",
+      countryOfBirth: "",
+      citizenship: "",
+      email: "",
+      phone: "",
+      street1: "123 Main St",
+      street2: "",
+      city: "Austin",
+      state: "",
+      postalCode: "78701",
+      country: "United States",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.dateOfBirth).toBeUndefined();
+      expect(result.data.email).toBeUndefined();
+    }
+  });
+
   it("validates child records", () => {
     expect(
       childSchema.safeParse({

@@ -9,8 +9,15 @@ const optionalText = z
   .transform((value) => (value ? value : undefined));
 
 const personName = z.string().trim().min(1).max(80);
-const dateString = z.string().trim().date().nullable().optional();
-const email = z.string().trim().email().nullable().optional();
+const blankToUndefined = (value: unknown) => (value === "" ? undefined : value);
+const dateString = z.preprocess(
+  blankToUndefined,
+  z.string().trim().date().optional(),
+);
+const email = z.preprocess(
+  blankToUndefined,
+  z.string().trim().email().optional(),
+);
 const phone = optionalText;
 
 export const caseTitleSchema = z.object({

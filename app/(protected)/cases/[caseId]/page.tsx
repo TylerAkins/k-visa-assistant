@@ -50,17 +50,23 @@ export default async function CaseOverviewPage({
           caseId={overview.case.id}
           title="Petitioner"
           description="Enter the U.S. citizen or lawful permanent resident petitioner details."
+          values={overview.petitioner}
           action={savePetitionerAction}
         />
         <PersonForm
           caseId={overview.case.id}
           title="Beneficiary"
           description="Enter the fiance(e) details for the K-1 case."
+          values={overview.beneficiary}
           action={saveBeneficiaryAction}
         />
       </div>
 
-      <ChildForm caseId={overview.case.id} action={addChildAction} />
+      <ChildForm
+        caseId={overview.case.id}
+        childRecords={overview.children}
+        action={addChildAction}
+      />
       <FutureFeaturePlaceholders />
     </div>
   );
