@@ -141,6 +141,7 @@ export const cases = pgTable(
     title: text("title").notNull(),
     status: text("status").notNull().default("draft"),
     progressPercent: integer("progress_percent").notNull().default(10),
+    childrenReviewed: boolean("children_reviewed").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

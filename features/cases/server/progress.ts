@@ -26,10 +26,12 @@ export function getCaseProgressState({
   petitioner,
   beneficiary,
   childrenCount,
+  childrenReviewed,
 }: {
   petitioner: { firstName: string; lastName: string; street1: string | null; city: string | null; postalCode: string | null; country: string | null } | null;
   beneficiary: { firstName: string; lastName: string; street1: string | null; city: string | null; postalCode: string | null; country: string | null } | null;
   childrenCount: number;
+  childrenReviewed: boolean;
 }): ProgressState {
   const petitionerComplete = Boolean(
     petitioner &&
@@ -57,7 +59,7 @@ export function getCaseProgressState({
     hasBeneficiary: Boolean(beneficiary),
     beneficiaryComplete,
     hasChildren: childrenCount > 0,
-    childrenReviewed: childrenCount > 0,
+    childrenReviewed,
     readyForQuestionnaire: petitionerComplete && beneficiaryComplete,
   };
 }

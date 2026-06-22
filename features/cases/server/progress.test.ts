@@ -43,9 +43,37 @@ describe("case progress", () => {
       },
       beneficiary: null,
       childrenCount: 0,
+      childrenReviewed: false,
     });
 
     expect(state.petitionerComplete).toBe(true);
     expect(state.readyForQuestionnaire).toBe(false);
+  });
+
+  it("allows the children section to be reviewed without child records", () => {
+    const state = getCaseProgressState({
+      petitioner: {
+        firstName: "Tyler",
+        lastName: "Akins",
+        street1: "123 Main St",
+        city: "Austin",
+        postalCode: "78701",
+        country: "United States",
+      },
+      beneficiary: {
+        firstName: "Van",
+        lastName: "Nguyen",
+        street1: "456 Oak Ave",
+        city: "Austin",
+        postalCode: "78701",
+        country: "United States",
+      },
+      childrenCount: 0,
+      childrenReviewed: true,
+    });
+
+    expect(state.hasChildren).toBe(false);
+    expect(state.childrenReviewed).toBe(true);
+    expect(calculateCaseProgress(state)).toBe(100);
   });
 });

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardCaseCards } from "@/features/cases/components/case-cards";
+import { CreateCaseForm } from "@/features/cases/components/forms";
 import { createCaseAction } from "@/features/cases/actions";
 import { listUserCases } from "@/features/cases/server/cases";
 
@@ -19,10 +20,7 @@ export default async function DashboardPage() {
           </p>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
-          <form action={createCaseAction}>
-            <input type="hidden" name="title" value="New K-1 case" />
-            <Button type="submit">Create New Case</Button>
-          </form>
+          <CreateCaseForm action={createCaseAction} />
           <Link href="/account/settings">
             <Button variant="secondary">Account settings</Button>
           </Link>

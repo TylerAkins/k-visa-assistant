@@ -29,6 +29,16 @@ export async function updateCaseTitle(caseId: string, input: FormData) {
   return { success: true };
 }
 
+export async function markChildrenReviewed(caseId: string) {
+  await db
+    .update(cases)
+    .set({ childrenReviewed: true, updatedAt: new Date() })
+    .where(eq(cases.id, caseId));
+
+  await updateCaseProgress(caseId);
+  return { success: true };
+}
+
 async function upsertSinglePerson(
   table: typeof petitioners | typeof beneficiaries,
   caseId: string,
@@ -85,6 +95,11 @@ export async function addChild(caseId: string, formData: FormData) {
     dateOfBirth: parsed.data.dateOfBirth ? new Date(parsed.data.dateOfBirth) : null,
     updatedAt: new Date(),
   });
+
+  await db
+    .update(cases)
+    .set({ childrenReviewed: true, updatedAt: new Date() })
+    .where(eq(cases.id, caseId));
 
   await updateCaseProgress(caseId);
   return { success: true };

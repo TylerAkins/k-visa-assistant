@@ -10,6 +10,7 @@ import {
 } from "@/features/cases/components/forms";
 import {
   addChildAction,
+  markChildrenReviewedAction,
   saveBeneficiaryAction,
   savePetitionerAction,
   updateCaseTitleAction,
@@ -19,9 +20,9 @@ import { getCaseOverview } from "@/features/cases/server/cases";
 export default async function CaseOverviewPage({
   params,
 }: {
-  params: { caseId: string };
+  params: Promise<{ caseId: string }>;
 }) {
-  const { caseId } = params;
+  const { caseId } = await params;
   const overview = await getCaseOverview(caseId).catch(() => null);
 
   if (!overview) {
@@ -65,7 +66,9 @@ export default async function CaseOverviewPage({
       <ChildForm
         caseId={overview.case.id}
         childRecords={overview.children}
-        action={addChildAction}
+        childrenReviewed={overview.case.childrenReviewed}
+        addAction={addChildAction}
+        reviewAction={markChildrenReviewedAction}
       />
       <FutureFeaturePlaceholders />
     </div>

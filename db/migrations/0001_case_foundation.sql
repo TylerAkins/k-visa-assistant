@@ -4,6 +4,7 @@ CREATE TABLE "cases" (
 	"title" text NOT NULL,
 	"status" text DEFAULT 'draft' NOT NULL,
 	"progress_percent" integer DEFAULT 10 NOT NULL,
+	"children_reviewed" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );

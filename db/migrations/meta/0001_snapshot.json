@@ -1,6 +1,6 @@
 {
-  "id": "34d2104a-42c1-4433-a8d4-6fd2329cd609",
-  "prevId": "e11cdded-4c10-4762-a094-09f218662242",
+  "id": "f32f7856-2d77-40bc-8cee-c941d99401b9",
+  "prevId": "34d2104a-42c1-4433-a8d4-6fd2329cd609",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -194,6 +194,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 10
+        },
+        "children_reviewed": {
+          "name": "children_reviewed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",

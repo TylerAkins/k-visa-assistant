@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { assertCaseOwnership, createCase } from "@/features/cases/server/cases";
 import {
   addChild,
+  markChildrenReviewed,
   saveBeneficiary,
   savePetitioner,
   updateCaseTitle,
@@ -51,6 +52,14 @@ export async function saveBeneficiaryAction(caseId: string, formData: FormData) 
 export async function addChildAction(caseId: string, formData: FormData) {
   await assertCaseOwnership(caseId);
   const result = await addChild(caseId, formData);
+  revalidatePath(`/cases/${caseId}`);
+  revalidatePath("/dashboard");
+  return result;
+}
+
+export async function markChildrenReviewedAction(caseId: string) {
+  await assertCaseOwnership(caseId);
+  const result = await markChildrenReviewed(caseId);
   revalidatePath(`/cases/${caseId}`);
   revalidatePath("/dashboard");
   return result;

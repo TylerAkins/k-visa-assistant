@@ -100,6 +100,7 @@ export async function getCaseOverview(caseId: string) {
         }
       : null,
     childrenCount: children.length,
+    childrenReviewed: caseRecord.childrenReviewed,
   });
 
   const progressPercent =
@@ -155,6 +156,7 @@ export async function updateCaseProgress(caseId: string) {
           }
         : null,
       childrenCount: overview.children.length,
+      childrenReviewed: overview.case.childrenReviewed,
     }),
   );
 

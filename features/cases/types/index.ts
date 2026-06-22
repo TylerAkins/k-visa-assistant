@@ -6,6 +6,7 @@ export type CaseRecord = {
   title: string;
   status: CaseStatus;
   progressPercent: number;
+  childrenReviewed: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
