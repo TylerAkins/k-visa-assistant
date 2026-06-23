@@ -3,6 +3,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -240,6 +241,105 @@ export const k2Children = pgTable(
   (table) => [index("k2_children_case_id_idx").on(table.caseId)],
 );
 
+export const questionnaireSections = pgTable(
+  "questionnaire_sections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    key: text("key").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("questionnaire_sections_key_idx").on(table.key),
+    index("questionnaire_sections_sort_order_idx").on(table.sortOrder),
+  ],
+);
+
+export const questionnaireQuestions = pgTable(
+  "questionnaire_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => questionnaireSections.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    helpText: text("help_text"),
+    questionType: text("question_type").notNull(),
+    required: boolean("required").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    config: jsonb("config"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("questionnaire_questions_section_id_idx").on(table.sectionId),
+    uniqueIndex("questionnaire_questions_key_idx").on(table.key),
+    index("questionnaire_questions_sort_order_idx").on(table.sortOrder),
+  ],
+);
+
+export const questionnaireAnswers = pgTable(
+  "questionnaire_answers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questionnaireQuestions.id, { onDelete: "cascade" }),
+    value: jsonb("value").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("questionnaire_answers_case_id_idx").on(table.caseId),
+    index("questionnaire_answers_question_id_idx").on(table.questionId),
+    uniqueIndex("questionnaire_answers_case_question_idx").on(
+      table.caseId,
+      table.questionId,
+    ),
+  ],
+);
+
+export const questionnaireCaseState = pgTable(
+  "questionnaire_case_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => cases.id, { onDelete: "cascade" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewStatus: text("review_status").notNull().default("not_started"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex("questionnaire_case_state_case_id_idx").on(table.caseId)],
+);
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   sessions: many(sessions),
   pendingLogins: many(pendingLogins),
@@ -293,6 +393,8 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
   petitioner: one(petitioners),
   beneficiary: one(beneficiaries),
   children: many(k2Children),
+  questionnaireAnswers: many(questionnaireAnswers),
+  questionnaireState: one(questionnaireCaseState),
 }));
 
 export const petitionersRelations = relations(petitioners, ({ one }) => ({
@@ -306,3 +408,45 @@ export const beneficiariesRelations = relations(beneficiaries, ({ one }) => ({
 export const k2ChildrenRelations = relations(k2Children, ({ one }) => ({
   case: one(cases, { fields: [k2Children.caseId], references: [cases.id] }),
 }));
+
+export const questionnaireSectionsRelations = relations(
+  questionnaireSections,
+  ({ many }) => ({
+    questions: many(questionnaireQuestions),
+  }),
+);
+
+export const questionnaireQuestionsRelations = relations(
+  questionnaireQuestions,
+  ({ one, many }) => ({
+    section: one(questionnaireSections, {
+      fields: [questionnaireQuestions.sectionId],
+      references: [questionnaireSections.id],
+    }),
+    answers: many(questionnaireAnswers),
+  }),
+);
+
+export const questionnaireAnswersRelations = relations(
+  questionnaireAnswers,
+  ({ one }) => ({
+    case: one(cases, {
+      fields: [questionnaireAnswers.caseId],
+      references: [cases.id],
+    }),
+    question: one(questionnaireQuestions, {
+      fields: [questionnaireAnswers.questionId],
+      references: [questionnaireQuestions.id],
+    }),
+  }),
+);
+
+export const questionnaireCaseStateRelations = relations(
+  questionnaireCaseState,
+  ({ one }) => ({
+    case: one(cases, {
+      fields: [questionnaireCaseState.caseId],
+      references: [cases.id],
+    }),
+  }),
+);
