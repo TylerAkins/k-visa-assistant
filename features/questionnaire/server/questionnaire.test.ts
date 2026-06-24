@@ -20,6 +20,7 @@ vi.mock("@/features/cases/server/cases", () => ({
 
 import {
   getQuestionnaireForCase,
+  listQuestionnaireDefinition,
   updateQuestionnaireCaseState,
   upsertQuestionnaireAnswer,
 } from "@/features/questionnaire/server/questionnaire";
@@ -52,20 +53,51 @@ function createInsertQuery<T>(rows: T[]) {
   };
 }
 
-const section = {
-  id: "section-1",
-  key: "background",
-  title: "Background",
-  description: "Case background",
+const petitionerSection = {
+  id: "section-petitioner",
+  key: "petitioner",
+  title: "Database petitioner title",
+  description: "Database petitioner description",
   sortOrder: 1,
   active: true,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 };
 
+const beneficiarySection = {
+  ...petitionerSection,
+  id: "section-beneficiary",
+  key: "beneficiary",
+  title: "Database beneficiary title",
+  sortOrder: 2,
+};
+
+const relationshipSection = {
+  ...petitionerSection,
+  id: "section-relationship",
+  key: "relationship",
+  title: "Database relationship title",
+  sortOrder: 3,
+};
+
+const childrenSection = {
+  ...petitionerSection,
+  id: "section-children",
+  key: "children",
+  title: "Database children title",
+  sortOrder: 4,
+};
+
+const completeSections = [
+  petitionerSection,
+  beneficiarySection,
+  relationshipSection,
+  childrenSection,
+];
+
 const activeQuestion = {
   id: "question-1",
-  sectionId: "section-1",
+  sectionId: "section-petitioner",
   key: "met_in_person",
   label: "Have you met in person?",
   helpText: null,
@@ -102,8 +134,8 @@ describe("questionnaire data access", () => {
 
     mockDb.select
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([section]))
-      .mockReturnValueOnce(createSelectQuery([section]))
+      .mockReturnValueOnce(createSelectQuery([petitionerSection]))
+      .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
       .mockReturnValueOnce(
         createSelectQuery([
@@ -129,22 +161,22 @@ describe("questionnaire data access", () => {
       value: true,
     });
 
-    await expect(getQuestionnaireForCase("case-1")).resolves.toMatchObject({
-      sections: [
-        {
-          key: "background",
-          questions: [{ key: "met_in_person" }],
-        },
-      ],
-      answers: [
-        {
-          caseId: "case-1",
-          questionKey: "met_in_person",
-          value: true,
-        },
-      ],
-      state: null,
+    const questionnaire = await getQuestionnaireForCase("case-1");
+
+    expect(questionnaire.sections).toHaveLength(4);
+    expect(questionnaire.sections[0]).toMatchObject({
+      key: "petitioner",
+      sortOrder: 10,
+      questions: [{ key: "met_in_person" }],
     });
+    expect(questionnaire.answers).toEqual([
+      expect.objectContaining({
+        caseId: "case-1",
+        questionKey: "met_in_person",
+        value: true,
+      }),
+    ]);
+    expect(questionnaire.state).toBeNull();
   });
 
   it("upserts answers instead of inserting duplicate case/question rows", async () => {
@@ -162,7 +194,7 @@ describe("questionnaire data access", () => {
 
     mockDb.select
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([section]));
+      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
     mockDb.insert.mockReturnValueOnce(insertQuery.query);
 
     await upsertQuestionnaireAnswer("case-1", "met_in_person", "updated");
@@ -221,7 +253,7 @@ describe("questionnaire data access", () => {
     const reviewedAt = new Date("2026-02-02T00:00:00.000Z");
 
     mockDb.select
-      .mockReturnValueOnce(createSelectQuery([section]))
+      .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
       .mockReturnValueOnce(createSelectQuery([]))
       .mockReturnValueOnce(
@@ -269,5 +301,64 @@ describe("questionnaire data access", () => {
     ).rejects.toThrow("Questionnaire question not found.");
 
     expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("orders active questionnaire sections by registry order", async () => {
+    mockDb.select
+      .mockReturnValueOnce(
+        createSelectQuery([
+          relationshipSection,
+          childrenSection,
+          petitionerSection,
+          beneficiarySection,
+        ]),
+      )
+      .mockReturnValueOnce(createSelectQuery([activeQuestion]));
+
+    await expect(listQuestionnaireDefinition()).resolves.toMatchObject([
+      {
+        key: "petitioner",
+        title: "Petitioner",
+        description: "U.S. citizen petitioner information for the case.",
+        sortOrder: 10,
+      },
+      { key: "beneficiary", title: "Beneficiary", sortOrder: 20 },
+      { key: "relationship", title: "Relationship", sortOrder: 30 },
+      { key: "children", title: "Children", sortOrder: 40 },
+    ]);
+  });
+
+  it("rejects missing Phase 3 questionnaire section identifiers", async () => {
+    mockDb.select.mockReturnValueOnce(
+      createSelectQuery([
+        petitionerSection,
+        beneficiarySection,
+        relationshipSection,
+      ]),
+    );
+
+    await expect(listQuestionnaireDefinition()).rejects.toThrow(
+      "Missing questionnaire section identifier(s): children.",
+    );
+
+    expect(mockDb.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects unknown active questionnaire section identifiers", async () => {
+    mockDb.select.mockReturnValueOnce(
+      createSelectQuery([
+        petitionerSection,
+        beneficiarySection,
+        relationshipSection,
+        childrenSection,
+        { ...petitionerSection, id: "section-travel", key: "travel" },
+      ]),
+    );
+
+    await expect(listQuestionnaireDefinition()).rejects.toThrow(
+      "Unknown questionnaire section identifier(s): travel.",
+    );
+
+    expect(mockDb.select).toHaveBeenCalledTimes(1);
   });
 });
