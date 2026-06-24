@@ -10,6 +10,12 @@ import {
   questionnaireSections,
 } from "@/db/schema";
 import { assertCaseOwnership } from "@/features/cases/server/cases";
+import {
+  assertCompleteQuestionnaireSectionIds,
+  getQuestionnaireSectionMetadata,
+  getQuestionnaireSectionSortOrder,
+  type QuestionnaireSectionId,
+} from "@/features/questionnaire/sections";
 import type {
   QuestionnaireAnswer,
   QuestionnaireAnswerValue,
@@ -58,9 +64,8 @@ export async function listQuestionnaireDefinition(): Promise<
     .where(eq(questionnaireSections.active, true))
     .orderBy(asc(questionnaireSections.sortOrder), asc(questionnaireSections.title));
 
-  if (sections.length === 0) {
-    return [] satisfies QuestionnaireSection[];
-  }
+  const sectionKeys = sections.map((section) => section.key);
+  assertCompleteQuestionnaireSectionIds(sectionKeys);
 
   const questions = await db
     .select()
@@ -79,14 +84,29 @@ export async function listQuestionnaireDefinition(): Promise<
     questionsBySectionId.set(question.sectionId, sectionQuestions);
   }
 
-  return sections.map((section) => ({
-    id: section.id,
-    key: section.key,
-    title: section.title,
-    description: section.description,
-    sortOrder: section.sortOrder,
-    questions: questionsBySectionId.get(section.id) ?? [],
-  })) satisfies QuestionnaireSection[];
+  return [...sections]
+    .sort((first, second) => {
+      const firstKey = first.key as QuestionnaireSectionId;
+      const secondKey = second.key as QuestionnaireSectionId;
+
+      return (
+        getQuestionnaireSectionSortOrder(firstKey) -
+        getQuestionnaireSectionSortOrder(secondKey)
+      );
+    })
+    .map((section) => {
+      const sectionKey = section.key as QuestionnaireSectionId;
+      const metadata = getQuestionnaireSectionMetadata(sectionKey);
+
+      return {
+        id: section.id,
+        key: metadata.id,
+        title: metadata.title,
+        description: metadata.description,
+        sortOrder: metadata.sortOrder,
+        questions: questionsBySectionId.get(section.id) ?? [],
+      } satisfies QuestionnaireSection;
+    });
 }
 
 export async function getQuestionnaireForCase(
