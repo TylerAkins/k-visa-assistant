@@ -7,6 +7,7 @@
 - `questionnaire_sections` remains the database-backed definition table for active sections, but active section keys must match the registry.
 - `features/questionnaire/server/` owns case-scoped questionnaire reads and writes.
 - `features/questionnaire/validation/` owns answer value and review state validation.
+- [I-129F questionnaire coverage](i-129f-questionnaire-coverage.md) tracks the form fields, conditional branches, evidence requirements, and known gaps that future questionnaire work must close.
 
 ## Section Registry
 

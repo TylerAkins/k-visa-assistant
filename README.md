@@ -63,6 +63,7 @@ Day-to-day development runs on **local** only. Use `pnpm setup` (default) with D
 - [Authentication](docs/auth.md): registration, sessions, email verification, password reset, and TOTP.
 - [Environments](docs/environments.md): local setup today; dev/prod templates for later phases.
 - [Questionnaire](docs/questionnaire.md): Phase 3 section registry, case attachment, and review state architecture.
+- [I-129F questionnaire coverage](docs/i-129f-questionnaire-coverage.md): current coverage gaps, required branches, and evidence checklist.
 - [Testing](docs/testing.md): unit test and coverage policy.
 
 ## Project status
