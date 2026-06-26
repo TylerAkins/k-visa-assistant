@@ -21,6 +21,7 @@ vi.mock("@/features/cases/server/cases", () => ({
 import {
   getQuestionnaireForCase,
   listQuestionnaireDefinition,
+  saveQuestionnaireSectionAnswers,
   updateQuestionnaireCaseState,
   upsertQuestionnaireAnswer,
 } from "@/features/questionnaire/server/questionnaire";
@@ -207,6 +208,95 @@ describe("questionnaire data access", () => {
     );
   });
 
+  it("saves section answers using stable question keys", async () => {
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const insertQuery = createInsertQuery([
+      {
+        id: "answer-1",
+        caseId: "case-1",
+        questionId: "question-1",
+        value: true,
+        createdAt: savedAt,
+        updatedAt: savedAt,
+      },
+    ]);
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
+    mockDb.insert.mockReturnValueOnce(insertQuery.query);
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({ success: true });
+
+    expect(insertQuery.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: "case-1",
+        questionId: "question-1",
+        value: true,
+      }),
+    );
+  });
+
+  it("rejects invalid posted values before writing answers", async () => {
+    const formData = new FormData();
+    formData.set("met_in_person", "maybe");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({
+      success: false,
+      error: 'Choose yes or no for "Have you met in person?".',
+    });
+
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("does not partially save earlier answers when a later answer is invalid", async () => {
+    const selectQuestion = {
+      ...activeQuestion,
+      id: "question-2",
+      key: "citizenship_basis",
+      label: "Citizenship basis",
+      questionType: "select",
+      sortOrder: 2,
+      config: {
+        options: [{ label: "Naturalization", value: "naturalization" }],
+      },
+    };
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
+    formData.set("citizenship_basis", "invalid");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion, selectQuestion]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({
+      success: false,
+      error: 'Choose a valid option for "Citizenship basis".',
+    });
+
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
   it("rejects unowned cases before reading questionnaire data", async () => {
     mockAssertCaseOwnership.mockRejectedValueOnce(new Error("Unauthorized"));
 
@@ -360,5 +450,15 @@ describe("questionnaire data access", () => {
     );
 
     expect(mockDb.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects unsupported active question types", async () => {
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(
+        createSelectQuery([{ ...activeQuestion, questionType: "file" }]),
+      );
+
+    await expect(listQuestionnaireDefinition()).rejects.toThrow();
   });
 });

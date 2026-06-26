@@ -2,8 +2,10 @@ import { z } from "zod";
 
 import type {
   QuestionnaireAnswerValue,
+  QuestionnaireQuestionConfig,
   QuestionnaireReviewStatus,
 } from "@/features/questionnaire/types";
+import { questionnaireQuestionTypes } from "@/features/questionnaire/types";
 
 export const questionnaireReviewStatuses = [
   "not_started",
@@ -11,6 +13,17 @@ export const questionnaireReviewStatuses = [
   "approved",
   "needs_changes",
 ] as const satisfies readonly QuestionnaireReviewStatus[];
+
+export const questionnaireQuestionTypeSchema = z.enum(questionnaireQuestionTypes);
+
+const questionnaireSelectOptionSchema = z.object({
+  label: z.string().trim().min(1).max(160),
+  value: z.string().trim().min(1).max(160),
+});
+
+const questionnaireSelectConfigSchema = z.object({
+  options: z.array(questionnaireSelectOptionSchema).min(1),
+});
 
 function isJsonSerializable(
   value: unknown,
@@ -64,6 +77,29 @@ export const questionnaireCaseStateSchema = z.object({
   reviewedAt: z.date().nullable().optional(),
   reviewStatus: z.enum(questionnaireReviewStatuses).optional(),
 });
+
+export function parseQuestionnaireQuestionConfig(
+  questionType: unknown,
+  config: unknown,
+): QuestionnaireQuestionConfig {
+  const parsedType = parseQuestionnaireQuestionType(questionType);
+
+  if (parsedType === "select") {
+    return questionnaireSelectConfigSchema.parse(config);
+  }
+
+  if (config !== null && config !== undefined) {
+    throw new Error(
+      `Question type "${parsedType}" does not support configuration yet.`,
+    );
+  }
+
+  return null;
+}
+
+export function parseQuestionnaireQuestionType(questionType: unknown) {
+  return questionnaireQuestionTypeSchema.parse(questionType);
+}
 
 export type UpsertQuestionnaireAnswerInput = z.infer<
   typeof upsertQuestionnaireAnswerSchema
