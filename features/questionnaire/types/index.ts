@@ -28,10 +28,18 @@ export type QuestionnaireSelectOption = {
   value: string;
 };
 
+export type QuestionnaireConditionValue = string | number | boolean | null;
+
+export type QuestionnaireVisibilityCondition = {
+  questionKey: string;
+  equals: QuestionnaireConditionValue;
+};
+
 export type QuestionnaireQuestionConfig =
   | null
   | {
-      options: QuestionnaireSelectOption[];
+      options?: QuestionnaireSelectOption[];
+      visibleWhen?: QuestionnaireVisibilityCondition;
     };
 
 export type QuestionnaireQuestion = {

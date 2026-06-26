@@ -35,6 +35,21 @@ const questionnaire = {
           config: null,
         },
         {
+          id: "question-waiver",
+          key: "meeting_waiver_explanation",
+          label: "Meeting waiver explanation",
+          helpText: "Explain why the in-person meeting requirement does not apply.",
+          questionType: "textarea",
+          required: true,
+          sortOrder: 25,
+          config: {
+            visibleWhen: {
+              questionKey: "met_in_person",
+              equals: false,
+            },
+          },
+        },
+        {
           id: "question-basis",
           key: "citizenship_basis",
           label: "Citizenship basis",
@@ -87,5 +102,46 @@ describe("QuestionnaireWorkflow", () => {
     expect(html).toContain("We met in 2024.");
     expect(html).toContain('name="citizenship_basis"');
     expect(html).toContain("Naturalization");
+    expect(html).not.toContain('name="meeting_waiver_explanation"');
+  });
+
+  it("renders conditional questions when dependency answers match", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: {
+          ...questionnaire,
+          answers: [
+            {
+              caseId: "case-1",
+              questionId: "question-met",
+              questionKey: "met_in_person",
+              value: false,
+              updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            },
+          ],
+        },
+        saveSectionAction: async () => ({ success: true }),
+      }),
+    );
+
+    expect(html).toContain("Meeting waiver explanation");
+    expect(html).toContain('name="meeting_waiver_explanation"');
+  });
+
+  it("hides conditional questions when dependency answers are missing", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: {
+          ...questionnaire,
+          answers: [],
+        },
+        saveSectionAction: async () => ({ success: true }),
+      }),
+    );
+
+    expect(html).not.toContain("Meeting waiver explanation");
+    expect(html).not.toContain('name="meeting_waiver_explanation"');
   });
 });

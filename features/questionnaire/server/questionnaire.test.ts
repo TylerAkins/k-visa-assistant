@@ -7,6 +7,7 @@ const { mockAssertCaseOwnership, mockDb } = vi.hoisted(() => ({
   mockDb: {
     select: vi.fn(),
     insert: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -51,6 +52,15 @@ function createInsertQuery<T>(rows: T[]) {
     values,
     onConflictDoUpdate,
     returning,
+  };
+}
+
+function createDeleteQuery() {
+  const where = vi.fn(() => Promise.resolve());
+
+  return {
+    query: { where },
+    where,
   };
 }
 
@@ -109,6 +119,22 @@ const activeQuestion = {
   config: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+};
+
+const waiverQuestion = {
+  ...activeQuestion,
+  id: "question-waiver",
+  key: "meeting_waiver_explanation",
+  label: "Meeting waiver explanation",
+  questionType: "textarea",
+  required: true,
+  sortOrder: 2,
+  config: {
+    visibleWhen: {
+      questionKey: "met_in_person",
+      equals: false,
+    },
+  },
 };
 
 describe("questionnaire data access", () => {
@@ -295,6 +321,123 @@ describe("questionnaire data access", () => {
     });
 
     expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("does not require hidden conditional questions", async () => {
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const insertQuery = createInsertQuery([
+      {
+        id: "answer-1",
+        caseId: "case-1",
+        questionId: "question-1",
+        value: true,
+        createdAt: savedAt,
+        updatedAt: savedAt,
+      },
+    ]);
+    const deleteQuery = createDeleteQuery();
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion, waiverQuestion]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
+    mockDb.delete.mockReturnValueOnce(deleteQuery.query);
+    mockDb.insert.mockReturnValueOnce(insertQuery.query);
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({ success: true });
+
+    expect(deleteQuery.where).toHaveBeenCalledTimes(1);
+    expect(insertQuery.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: "case-1",
+        questionId: "question-1",
+        value: true,
+      }),
+    );
+  });
+
+  it("requires visible conditional questions", async () => {
+    const formData = new FormData();
+    formData.set("met_in_person", "false");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion, waiverQuestion]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({
+      success: false,
+      error: 'Please answer "Meeting waiver explanation" before saving.',
+    });
+
+    expect(mockDb.delete).not.toHaveBeenCalled();
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("clears stale hidden answers and ignores hidden posted values", async () => {
+    const hiddenDateQuestion = {
+      ...waiverQuestion,
+      label: "Hidden date",
+      questionType: "date",
+    };
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const insertQuery = createInsertQuery([
+      {
+        id: "answer-1",
+        caseId: "case-1",
+        questionId: "question-1",
+        value: true,
+        createdAt: savedAt,
+        updatedAt: savedAt,
+      },
+    ]);
+    const deleteQuery = createDeleteQuery();
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
+    formData.set("meeting_waiver_explanation", "not-a-date");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion, hiddenDateQuestion]))
+      .mockReturnValueOnce(
+        createSelectQuery([
+          {
+            id: "answer-waiver",
+            caseId: "case-1",
+            questionId: "question-waiver",
+            value: "Previously saved waiver.",
+            createdAt: savedAt,
+            updatedAt: savedAt,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
+    mockDb.delete.mockReturnValueOnce(deleteQuery.query);
+    mockDb.insert.mockReturnValueOnce(insertQuery.query);
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({ success: true });
+
+    expect(deleteQuery.where).toHaveBeenCalledTimes(1);
+    expect(insertQuery.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-1",
+        value: true,
+      }),
+    );
   });
 
   it("rejects unowned cases before reading questionnaire data", async () => {

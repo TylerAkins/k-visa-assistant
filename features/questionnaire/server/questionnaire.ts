@@ -10,6 +10,7 @@ import {
   questionnaireSections,
 } from "@/db/schema";
 import { assertCaseOwnership } from "@/features/cases/server/cases";
+import { isQuestionVisible } from "@/features/questionnaire/conditions";
 import {
   assertCompleteQuestionnaireSectionIds,
   getQuestionnaireSectionMetadata,
@@ -234,6 +235,17 @@ export async function upsertQuestionnaireAnswer(
   } satisfies QuestionnaireAnswer;
 }
 
+async function deleteQuestionnaireAnswer(caseId: string, questionId: string) {
+  await db
+    .delete(questionnaireAnswers)
+    .where(
+      and(
+        eq(questionnaireAnswers.caseId, caseId),
+        eq(questionnaireAnswers.questionId, questionId),
+      ),
+    );
+}
+
 export async function saveQuestionnaireSectionAnswers(
   caseId: string,
   sectionKey: string,
@@ -247,7 +259,18 @@ export async function saveQuestionnaireSectionAnswers(
   }
 
   const parsedAnswers: { questionKey: string; value: QuestionnaireAnswerValue }[] = [];
+  const hiddenQuestionIds: string[] = [];
+  const answersByQuestionKey = new Map(
+    questionnaire.answers.map((answer) => [answer.questionKey, answer.value]),
+  );
+
   for (const question of section.questions) {
+    if (!isQuestionVisible(question, answersByQuestionKey)) {
+      hiddenQuestionIds.push(question.id);
+      answersByQuestionKey.delete(question.key);
+      continue;
+    }
+
     const parsedValue = parseQuestionnaireFormValue(question, formData);
 
     if (!parsedValue.success) {
@@ -262,6 +285,11 @@ export async function saveQuestionnaireSectionAnswers(
     }
 
     parsedAnswers.push({ questionKey: question.key, value: parsedValue.value });
+    answersByQuestionKey.set(question.key, parsedValue.value);
+  }
+
+  for (const questionId of hiddenQuestionIds) {
+    await deleteQuestionnaireAnswer(caseId, questionId);
   }
 
   for (const answer of parsedAnswers) {
@@ -365,7 +393,7 @@ function parseQuestionnaireFormValue(
         return { success: true, value: null };
       }
 
-      const option = question.config?.options.find(
+      const option = question.config?.options?.find(
         (item) => item.value === value,
       );
 

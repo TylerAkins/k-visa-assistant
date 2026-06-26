@@ -45,3 +45,16 @@ Initial supported question types:
 | `select` | selected option value or null | `{ "options": [{ "label": "...", "value": "..." }] }` |
 
 Unsupported question types and unexpected config fail during definition mapping instead of silently rendering or dropping submitted values.
+
+Questions may also include one visibility condition in config:
+
+```json
+{
+  "visibleWhen": {
+    "questionKey": "met_in_person",
+    "equals": false
+  }
+}
+```
+
+Questions without `visibleWhen` are always visible. Conditional questions are visible only when the referenced answer exactly matches `equals`; missing dependency answers only match `equals: null`. Hidden required questions do not block section saves, and hidden saved answers are cleared when the section is saved.

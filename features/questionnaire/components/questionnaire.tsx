@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormMessage } from "@/features/auth/components/form-message";
+import { isQuestionVisible } from "@/features/questionnaire/conditions";
 import type {
   QuestionnaireAnswer,
   QuestionnaireAnswerValue,
@@ -83,9 +84,27 @@ function QuestionnaireSectionForm({
       action(caseId, section.key, formData),
     { success: false },
   );
-  const answersByQuestionKey = new Map(
-    answers.map((answer) => [answer.questionKey, answer.value]),
+  const [answersByQuestionKey, setAnswersByQuestionKey] = useState(
+    () =>
+      pruneHiddenAnswers(
+        section,
+        new Map(
+          answers.map((answer) => [answer.questionKey, answer.value] as const),
+        ),
+      ),
   );
+  const visibleQuestions = getVisibleQuestions(section, answersByQuestionKey);
+
+  function updateAnswer(
+    questionKey: string,
+    value: QuestionnaireAnswerValue,
+  ) {
+    setAnswersByQuestionKey((currentAnswers) => {
+      const nextAnswers = new Map(currentAnswers);
+      nextAnswers.set(questionKey, value);
+      return pruneHiddenAnswers(section, nextAnswers);
+    });
+  }
 
   return (
     <Card>
@@ -98,12 +117,13 @@ function QuestionnaireSectionForm({
       <CardContent>
         <FormMessage message={state.error} />
         <form action={formAction} className="space-y-4">
-          {section.questions.length > 0 ? (
-            section.questions.map((question) => (
+          {visibleQuestions.length > 0 ? (
+            visibleQuestions.map((question) => (
               <QuestionField
                 key={question.key}
                 question={question}
                 value={answersByQuestionKey.get(question.key)}
+                onValueChange={(value) => updateAnswer(question.key, value)}
               />
             ))
           ) : (
@@ -123,9 +143,11 @@ function QuestionnaireSectionForm({
 function QuestionField({
   question,
   value,
+  onValueChange,
 }: {
   question: QuestionnaireQuestion;
   value: QuestionnaireAnswerValue | undefined;
+  onValueChange: (value: QuestionnaireAnswerValue) => void;
 }) {
   const fieldId = `question-${question.key}`;
 
@@ -138,7 +160,12 @@ function QuestionField({
       {question.helpText ? (
         <p className="text-sm text-muted-foreground">{question.helpText}</p>
       ) : null}
-      <QuestionInput id={fieldId} question={question} value={value} />
+      <QuestionInput
+        id={fieldId}
+        question={question}
+        value={value}
+        onValueChange={onValueChange}
+      />
     </div>
   );
 }
@@ -147,10 +174,12 @@ function QuestionInput({
   id,
   question,
   value,
+  onValueChange,
 }: {
   id: string;
   question: QuestionnaireQuestion;
   value: QuestionnaireAnswerValue | undefined;
+  onValueChange: (value: QuestionnaireAnswerValue) => void;
 }) {
   switch (question.questionType) {
     case "text":
@@ -158,7 +187,8 @@ function QuestionInput({
         <Input
           id={id}
           name={question.key}
-          defaultValue={stringAnswerValue(value)}
+          value={stringAnswerValue(value)}
+          onChange={(event) => onValueChange(event.currentTarget.value || null)}
           required={question.required}
         />
       );
@@ -168,7 +198,8 @@ function QuestionInput({
           id={id}
           name={question.key}
           type="date"
-          defaultValue={stringAnswerValue(value)}
+          value={stringAnswerValue(value)}
+          onChange={(event) => onValueChange(event.currentTarget.value || null)}
           required={question.required}
         />
       );
@@ -177,7 +208,8 @@ function QuestionInput({
         <textarea
           id={id}
           name={question.key}
-          defaultValue={stringAnswerValue(value)}
+          value={stringAnswerValue(value)}
+          onChange={(event) => onValueChange(event.currentTarget.value || null)}
           required={question.required}
           className={cn(
             "min-h-28 w-full min-w-0 rounded-md border border-input bg-input/30 px-3 py-2 text-sm text-foreground shadow-inner outline-none transition-colors hover:border-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50",
@@ -189,7 +221,20 @@ function QuestionInput({
         <SelectControl
           id={id}
           name={question.key}
-          defaultValue={booleanAnswerValue(value)}
+          value={booleanAnswerValue(value)}
+          onValueChange={(nextValue) => {
+            if (nextValue === "true") {
+              onValueChange(true);
+              return;
+            }
+
+            if (nextValue === "false") {
+              onValueChange(false);
+              return;
+            }
+
+            onValueChange(null);
+          }}
           required={question.required}
           options={[
             { label: "Yes", value: "true" },
@@ -202,7 +247,8 @@ function QuestionInput({
         <SelectControl
           id={id}
           name={question.key}
-          defaultValue={stringAnswerValue(value)}
+          value={stringAnswerValue(value)}
+          onValueChange={(nextValue) => onValueChange(nextValue || null)}
           required={question.required}
           options={question.config?.options ?? []}
         />
@@ -218,13 +264,15 @@ function SelectControl({
   id,
   name,
   options,
-  defaultValue,
+  value,
+  onValueChange,
   required,
 }: {
   id: string;
   name: string;
   options: ReadonlyArray<{ label: string; value: string }>;
-  defaultValue: string;
+  value: string;
+  onValueChange: (value: string) => void;
   required: boolean;
 }) {
   return (
@@ -232,7 +280,8 @@ function SelectControl({
       <select
         id={id}
         name={name}
-        defaultValue={defaultValue}
+        value={value}
+        onChange={(event) => onValueChange(event.currentTarget.value)}
         required={required}
         className={cn(
           "h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-input/30 px-3 pr-9 text-sm text-foreground shadow-inner outline-none transition-colors hover:border-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50",
@@ -263,4 +312,38 @@ function booleanAnswerValue(value: QuestionnaireAnswerValue | undefined) {
   }
 
   return value ? "true" : "false";
+}
+
+function getVisibleQuestions(
+  section: QuestionnaireSection,
+  answersByQuestionKey: ReadonlyMap<string, QuestionnaireAnswerValue>,
+) {
+  const visibleQuestions: QuestionnaireQuestion[] = [];
+  const visibleAnswersByQuestionKey = new Map(answersByQuestionKey);
+
+  for (const question of section.questions) {
+    if (isQuestionVisible(question, visibleAnswersByQuestionKey)) {
+      visibleQuestions.push(question);
+      continue;
+    }
+
+    visibleAnswersByQuestionKey.delete(question.key);
+  }
+
+  return visibleQuestions;
+}
+
+function pruneHiddenAnswers(
+  section: QuestionnaireSection,
+  answersByQuestionKey: ReadonlyMap<string, QuestionnaireAnswerValue>,
+) {
+  const visibleAnswersByQuestionKey = new Map(answersByQuestionKey);
+
+  for (const question of section.questions) {
+    if (!isQuestionVisible(question, visibleAnswersByQuestionKey)) {
+      visibleAnswersByQuestionKey.delete(question.key);
+    }
+  }
+
+  return visibleAnswersByQuestionKey;
 }
