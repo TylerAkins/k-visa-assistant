@@ -13,7 +13,10 @@ import { FormMessage } from "@/features/auth/components/form-message";
 import type { CaseOverviewData } from "@/features/cases/types";
 import { kVisaCountryOptions } from "@/features/cases/types/k-visa-countries";
 import { QuestionnaireWorkflow } from "@/features/questionnaire/components/questionnaire";
-import type { QuestionnaireForCase } from "@/features/questionnaire/types";
+import type {
+  QuestionnaireForCase,
+  QuestionnaireSectionSaveResult,
+} from "@/features/questionnaire/types";
 import { cn } from "@/lib/utils";
 
 type CaseActionState = {
@@ -163,7 +166,7 @@ export function CaseEditor({
     caseId: string,
     sectionKey: string,
     formData: FormData,
-  ) => Promise<CaseActionState>;
+  ) => Promise<QuestionnaireSectionSaveResult>;
 }) {
   const [progressPercent, setProgressPercent] = useState(
     overview.case.progressPercent,

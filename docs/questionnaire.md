@@ -58,3 +58,11 @@ Questions may also include one visibility condition in config:
 ```
 
 Questions without `visibleWhen` are always visible. Conditional questions are visible only when the referenced answer exactly matches `equals`; missing dependency answers only match `equals: null`. Hidden required questions do not block section saves, and hidden saved answers are cleared when the section is saved.
+
+## Answer Validation
+
+- Section submissions are validated from their active question definitions before any answers are written or hidden answers are cleared.
+- Text and textarea answers are trimmed. Blank optional answers are stored as `null`.
+- Date answers must be real calendar dates in `YYYY-MM-DD` format.
+- Boolean answers accept only yes or no values, and select answers must match a configured option value.
+- Required validation applies only to visible questions. Validation failures are returned by stable question key so the UI can display each error beside its field.
