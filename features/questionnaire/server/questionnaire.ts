@@ -393,7 +393,7 @@ function parseQuestionnaireFormValue(
         return { success: true, value: null };
       }
 
-      const option = question.config?.options.find(
+      const option = question.config?.options?.find(
         (item) => item.value === value,
       );
 
