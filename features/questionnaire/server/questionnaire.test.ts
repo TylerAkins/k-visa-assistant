@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockAssertCaseOwnership, mockDb, mockUpdateCaseProgress } = vi.hoisted(() => ({
+const { mockAssertCaseOwnership, mockDb, mockGetPhase2CaseProgress } = vi.hoisted(() => ({
   mockAssertCaseOwnership: vi.fn(),
-  mockUpdateCaseProgress: vi.fn(),
+  mockGetPhase2CaseProgress: vi.fn(),
   mockDb: {
     select: vi.fn(),
     insert: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/features/cases/server/cases", () => ({
   assertCaseOwnership: mockAssertCaseOwnership,
-  updateCaseProgress: mockUpdateCaseProgress,
+  getPhase2CaseProgress: mockGetPhase2CaseProgress,
 }));
 
 import {
@@ -35,6 +35,7 @@ function createSelectQuery<T>(rows: T[]) {
     where: vi.fn(() => query),
     orderBy: vi.fn(() => Promise.resolve(rows)),
     limit: vi.fn(() => Promise.resolve(rows)),
+    for: vi.fn(() => Promise.resolve(rows)),
     then: (
       resolve: (value: T[]) => unknown,
       reject: (reason?: unknown) => unknown,
@@ -57,27 +58,49 @@ function createInsertQuery<T>(rows: T[]) {
   };
 }
 
-function createTransactionQuery() {
+function createTransactionQuery({
+  currentAnswers = [],
+  currentState = [],
+}: {
+  currentAnswers?: unknown[];
+  currentState?: unknown[];
+} = {}) {
   const deleteWhere = vi.fn(() => Promise.resolve());
   const deleteAnswer = vi.fn(() => ({ where: deleteWhere }));
   const onConflictDoUpdate = vi.fn(() => Promise.resolve());
   const values = vi.fn(() => ({ onConflictDoUpdate }));
   const insertAnswer = vi.fn(() => ({ values }));
+  const lockQuery = createSelectQuery([{ id: "case-1" }]);
+  const select = vi
+    .fn()
+    .mockReturnValueOnce(lockQuery)
+    .mockReturnValueOnce(createSelectQuery(currentAnswers))
+    .mockReturnValueOnce(createSelectQuery(currentState));
+  const updateWhere = vi.fn(() => Promise.resolve());
+  const updateSet = vi.fn(() => ({ where: updateWhere }));
+  const updateCase = vi.fn(() => ({ set: updateSet }));
+  const transactionClient = {
+    delete: deleteAnswer,
+    insert: insertAnswer,
+    select,
+    update: updateCase,
+  };
 
   mockDb.transaction.mockImplementationOnce(
-    async (
-      callback: (tx: {
-        delete: typeof deleteAnswer;
-        insert: typeof insertAnswer;
-      }) => Promise<void>,
-    ) => callback({ delete: deleteAnswer, insert: insertAnswer }),
+    async (callback: (tx: typeof transactionClient) => Promise<unknown>) =>
+      callback(transactionClient),
   );
 
   return {
     deleteAnswer,
     deleteWhere,
     insertAnswer,
+    lockQuery,
     onConflictDoUpdate,
+    select,
+    updateCase,
+    updateSet,
+    updateWhere,
     values,
   };
 }
@@ -162,7 +185,10 @@ describe("questionnaire data access", () => {
       id: "case-1",
       userId: "user-1",
     });
-    mockUpdateCaseProgress.mockResolvedValue({ progressPercent: 78 });
+    mockGetPhase2CaseProgress.mockResolvedValue({
+      progressPercent: 70,
+      userId: "user-1",
+    });
   });
 
   it("creates and reads answers for an owned case", async () => {
@@ -211,7 +237,9 @@ describe("questionnaire data access", () => {
         value: true,
       }),
     );
-    expect(mockUpdateCaseProgress).toHaveBeenCalledWith("case-1", 0.25);
+    expect(transaction.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ progressPercent: 78 }),
+    );
 
     const questionnaire = await getQuestionnaireForCase("case-1");
 
@@ -236,8 +264,7 @@ describe("questionnaire data access", () => {
     });
   });
 
-  it("sets questionnaire completion and full case progress when all sections complete", async () => {
-    const transaction = createTransactionQuery();
+  it("uses locked authoritative answers to set full questionnaire progress", async () => {
     const formData = new FormData();
     formData.set("met_in_person", "true");
     const optionalQuestions = [
@@ -255,25 +282,22 @@ describe("questionnaire data access", () => {
       sortOrder: 1,
     }));
     const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const currentAnswers = optionalQuestions.map((question) => ({
+      id: `answer-${question.id}`,
+      caseId: "case-1",
+      questionId: question.id,
+      value: null,
+      createdAt: savedAt,
+      updatedAt: savedAt,
+    }));
+    const transaction = createTransactionQuery({ currentAnswers });
 
-    mockUpdateCaseProgress.mockResolvedValueOnce({ progressPercent: 100 });
     mockDb.select
       .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(
         createSelectQuery([activeQuestion, ...optionalQuestions]),
       )
-      .mockReturnValueOnce(
-        createSelectQuery(
-          optionalQuestions.map((question) => ({
-            id: `answer-${question.id}`,
-            caseId: "case-1",
-            questionId: question.id,
-            value: null,
-            createdAt: savedAt,
-            updatedAt: savedAt,
-          })),
-        ),
-      )
+      .mockReturnValueOnce(createSelectQuery([]))
       .mockReturnValueOnce(createSelectQuery([]));
 
     await expect(
@@ -291,14 +315,29 @@ describe("questionnaire data access", () => {
         reviewStatus: "not_started",
       }),
     );
-    expect(mockUpdateCaseProgress).toHaveBeenCalledWith("case-1", 1);
+    expect(transaction.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ progressPercent: 100 }),
+    );
+    expect(transaction.lockQuery.for).toHaveBeenCalledWith("update");
+    expect(transaction.select).toHaveBeenCalledTimes(3);
   });
 
   it("clears stale questionnaire completion when sections are incomplete", async () => {
-    const transaction = createTransactionQuery();
     const formData = new FormData();
     formData.set("met_in_person", "true");
     const completedAt = new Date("2026-02-01T00:00:00.000Z");
+    const currentState = [
+      {
+        id: "state-1",
+        caseId: "case-1",
+        completedAt,
+        reviewedAt: null,
+        reviewStatus: "not_started",
+        createdAt: completedAt,
+        updatedAt: completedAt,
+      },
+    ];
+    const transaction = createTransactionQuery({ currentState });
 
     mockDb.select
       .mockReturnValueOnce(createSelectQuery(completeSections))
