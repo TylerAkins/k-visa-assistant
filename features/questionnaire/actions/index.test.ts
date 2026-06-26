@@ -46,4 +46,37 @@ describe("questionnaire server actions", () => {
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/cases/case-1");
   });
+
+  it("does not revalidate when section validation fails", async () => {
+    const result = {
+      success: false as const,
+      fieldErrors: { met_in_person: ["Choose yes or no."] },
+    };
+    saveQuestionnaireSectionAnswersMock.mockResolvedValueOnce(result);
+
+    await expect(
+      saveQuestionnaireSectionAction(
+        "case-1",
+        "relationship",
+        new FormData(),
+      ),
+    ).resolves.toEqual(result);
+
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects unowned cases before saving or revalidating", async () => {
+    assertCaseOwnershipMock.mockRejectedValueOnce(new Error("Unauthorized"));
+
+    await expect(
+      saveQuestionnaireSectionAction(
+        "case-2",
+        "relationship",
+        new FormData(),
+      ),
+    ).rejects.toThrow("Unauthorized");
+
+    expect(saveQuestionnaireSectionAnswersMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
 });

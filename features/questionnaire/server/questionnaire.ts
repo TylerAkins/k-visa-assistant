@@ -31,7 +31,6 @@ import {
   parseQuestionnaireQuestionConfig,
   parseQuestionnaireQuestionType,
   questionnaireCaseStateSchema,
-  upsertQuestionnaireAnswerSchema,
 } from "@/features/questionnaire/validation/schemas";
 
 function mapQuestion(row: typeof questionnaireQuestions.$inferSelect) {
@@ -167,86 +166,6 @@ export async function getQuestionnaireForCase(
   };
 }
 
-export async function upsertQuestionnaireAnswer(
-  caseId: string,
-  questionKey: string,
-  value: unknown,
-): Promise<QuestionnaireAnswer> {
-  await assertCaseOwnership(caseId);
-  const parsed = upsertQuestionnaireAnswerSchema.parse({ questionKey, value });
-
-  const [question] = await db
-    .select()
-    .from(questionnaireQuestions)
-    .where(
-      and(
-        eq(questionnaireQuestions.key, parsed.questionKey),
-        eq(questionnaireQuestions.active, true),
-      ),
-    )
-    .limit(1);
-
-  if (!question) {
-    throw new Error("Questionnaire question not found.");
-  }
-
-  const [section] = await db
-    .select({ id: questionnaireSections.id })
-    .from(questionnaireSections)
-    .where(
-      and(
-        eq(questionnaireSections.id, question.sectionId),
-        eq(questionnaireSections.active, true),
-      ),
-    )
-    .limit(1);
-
-  if (!section) {
-    throw new Error("Questionnaire question not found.");
-  }
-
-  const now = new Date();
-  const [answer] = await db
-    .insert(questionnaireAnswers)
-    .values({
-      caseId,
-      questionId: question.id,
-      value: parsed.value as QuestionnaireAnswerValue,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [questionnaireAnswers.caseId, questionnaireAnswers.questionId],
-      set: {
-        value: parsed.value as QuestionnaireAnswerValue,
-        updatedAt: now,
-      },
-    })
-    .returning();
-
-  if (!answer) {
-    throw new Error("Unable to save questionnaire answer.");
-  }
-
-  return {
-    caseId: answer.caseId,
-    questionId: answer.questionId,
-    questionKey: question.key,
-    value: answer.value as QuestionnaireAnswerValue,
-    updatedAt: answer.updatedAt,
-  } satisfies QuestionnaireAnswer;
-}
-
-async function deleteQuestionnaireAnswer(caseId: string, questionId: string) {
-  await db
-    .delete(questionnaireAnswers)
-    .where(
-      and(
-        eq(questionnaireAnswers.caseId, caseId),
-        eq(questionnaireAnswers.questionId, questionId),
-      ),
-    );
-}
-
 export async function saveQuestionnaireSectionAnswers(
   caseId: string,
   sectionKey: string,
@@ -271,13 +190,50 @@ export async function saveQuestionnaireSectionAnswers(
     return validationResult;
   }
 
-  for (const questionId of validationResult.hiddenQuestionIds) {
-    await deleteQuestionnaireAnswer(caseId, questionId);
-  }
+  const questionIdsByKey = new Map(
+    section.questions.map((question) => [question.key, question.id]),
+  );
+  const answers = validationResult.answers.map((answer) => {
+    const questionId = questionIdsByKey.get(answer.questionKey);
 
-  for (const answer of validationResult.answers) {
-    await upsertQuestionnaireAnswer(caseId, answer.questionKey, answer.value);
-  }
+    if (!questionId) {
+      throw new Error("Questionnaire question not found.");
+    }
+
+    return { ...answer, questionId };
+  });
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    for (const questionId of validationResult.hiddenQuestionIds) {
+      await tx
+        .delete(questionnaireAnswers)
+        .where(
+          and(
+            eq(questionnaireAnswers.caseId, caseId),
+            eq(questionnaireAnswers.questionId, questionId),
+          ),
+        );
+    }
+
+    for (const answer of answers) {
+      await tx
+        .insert(questionnaireAnswers)
+        .values({
+          caseId,
+          questionId: answer.questionId,
+          value: answer.value,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [questionnaireAnswers.caseId, questionnaireAnswers.questionId],
+          set: {
+            value: answer.value,
+            updatedAt: now,
+          },
+        });
+    }
+  });
 
   return { success: true };
 }

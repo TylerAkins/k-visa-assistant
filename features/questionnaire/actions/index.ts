@@ -16,6 +16,10 @@ export async function saveQuestionnaireSectionAction(
     sectionKey,
     formData,
   );
-  revalidatePath(`/cases/${caseId}`);
+
+  if (result.success) {
+    revalidatePath(`/cases/${caseId}`);
+  }
+
   return result;
 }
