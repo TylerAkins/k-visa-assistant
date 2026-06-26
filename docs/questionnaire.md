@@ -29,3 +29,19 @@ Rendering, validation, progress, and review code should consume these identifier
 - All case-specific questionnaire reads and writes must validate ownership through `assertCaseOwnership(caseId)` before touching answers or review state.
 - Unknown active section identifiers fail fast so future screens do not render unsupported questionnaire structure.
 - Missing Phase 3 section identifiers fail fast so progress and review states do not drift from the expected workflow.
+
+## Dynamic Rendering
+
+Questionnaire UI renders from active `questionnaire_questions` rows grouped by the active section definitions. Form fields must use the stable question `key` as the submitted field name; database UUIDs remain internal identifiers.
+
+Initial supported question types:
+
+| Type | Answer value | Config |
+|------|--------------|--------|
+| `text` | string or null | none |
+| `textarea` | string or null | none |
+| `date` | `YYYY-MM-DD` string or null | none |
+| `boolean` | boolean or null | none |
+| `select` | selected option value or null | `{ "options": [{ "label": "...", "value": "..." }] }` |
+
+Unsupported question types and unexpected config fail during definition mapping instead of silently rendering or dropping submitted values.

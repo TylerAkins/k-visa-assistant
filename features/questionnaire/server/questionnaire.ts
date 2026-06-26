@@ -26,20 +26,28 @@ import type {
   QuestionnaireSection,
 } from "@/features/questionnaire/types";
 import {
+  parseQuestionnaireQuestionConfig,
+  parseQuestionnaireQuestionType,
   questionnaireCaseStateSchema,
   upsertQuestionnaireAnswerSchema,
 } from "@/features/questionnaire/validation/schemas";
 
 function mapQuestion(row: typeof questionnaireQuestions.$inferSelect) {
+  const questionType = parseQuestionnaireQuestionType(row.questionType);
+  const config = parseQuestionnaireQuestionConfig(
+    row.questionType,
+    row.config ?? null,
+  );
+
   return {
     id: row.id,
     key: row.key,
     label: row.label,
     helpText: row.helpText,
-    questionType: row.questionType,
+    questionType,
     required: row.required,
     sortOrder: row.sortOrder,
-    config: (row.config ?? null) as QuestionnaireAnswerValue | null,
+    config,
   } satisfies QuestionnaireQuestion;
 }
 
@@ -226,6 +234,43 @@ export async function upsertQuestionnaireAnswer(
   } satisfies QuestionnaireAnswer;
 }
 
+export async function saveQuestionnaireSectionAnswers(
+  caseId: string,
+  sectionKey: string,
+  formData: FormData,
+) {
+  const questionnaire = await getQuestionnaireForCase(caseId);
+  const section = questionnaire.sections.find((item) => item.key === sectionKey);
+
+  if (!section) {
+    throw new Error("Questionnaire section not found.");
+  }
+
+  const parsedAnswers: { questionKey: string; value: QuestionnaireAnswerValue }[] = [];
+  for (const question of section.questions) {
+    const parsedValue = parseQuestionnaireFormValue(question, formData);
+
+    if (!parsedValue.success) {
+      return { success: false, error: parsedValue.error };
+    }
+
+    if (question.required && parsedValue.value === null) {
+      return {
+        success: false,
+        error: `Please answer "${question.label}" before saving.`,
+      };
+    }
+
+    parsedAnswers.push({ questionKey: question.key, value: parsedValue.value });
+  }
+
+  for (const answer of parsedAnswers) {
+    await upsertQuestionnaireAnswer(caseId, answer.questionKey, answer.value);
+  }
+
+  return { success: true };
+}
+
 export async function updateQuestionnaireCaseState(
   caseId: string,
   input: unknown,
@@ -270,4 +315,72 @@ export async function updateQuestionnaireCaseState(
   }
 
   return mapCaseState(state);
+}
+
+function parseQuestionnaireFormValue(
+  question: QuestionnaireQuestion,
+  formData: FormData,
+):
+  | { success: true; value: QuestionnaireAnswerValue }
+  | { success: false; error: string } {
+  const rawValue = formData.get(question.key);
+  const value = typeof rawValue === "string" ? rawValue.trim() : "";
+
+  switch (question.questionType) {
+    case "text":
+    case "textarea":
+      return { success: true, value: value || null };
+    case "date":
+      if (!value) {
+        return { success: true, value: null };
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return {
+          success: false,
+          error: `Enter a valid date for "${question.label}".`,
+        };
+      }
+
+      return { success: true, value };
+    case "boolean":
+      if (!value) {
+        return { success: true, value: null };
+      }
+
+      if (value === "true") {
+        return { success: true, value: true };
+      }
+
+      if (value === "false") {
+        return { success: true, value: false };
+      }
+
+      return {
+        success: false,
+        error: `Choose yes or no for "${question.label}".`,
+      };
+    case "select": {
+      if (!value) {
+        return { success: true, value: null };
+      }
+
+      const option = question.config?.options.find(
+        (item) => item.value === value,
+      );
+
+      if (!option) {
+        return {
+          success: false,
+          error: `Choose a valid option for "${question.label}".`,
+        };
+      }
+
+      return { success: true, value };
+    }
+    default: {
+      const unsupportedType: never = question.questionType;
+      throw new Error(`Unsupported questionnaire question type: ${unsupportedType}.`);
+    }
+  }
 }

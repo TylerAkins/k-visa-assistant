@@ -1,3 +1,14 @@
+export const questionnaireQuestionTypes = [
+  "text",
+  "textarea",
+  "date",
+  "boolean",
+  "select",
+] as const;
+
+export type QuestionnaireQuestionType =
+  (typeof questionnaireQuestionTypes)[number];
+
 export type QuestionnaireAnswerValue =
   | string
   | number
@@ -12,15 +23,26 @@ export type QuestionnaireReviewStatus =
   | "approved"
   | "needs_changes";
 
+export type QuestionnaireSelectOption = {
+  label: string;
+  value: string;
+};
+
+export type QuestionnaireQuestionConfig =
+  | null
+  | {
+      options: QuestionnaireSelectOption[];
+    };
+
 export type QuestionnaireQuestion = {
   id: string;
   key: string;
   label: string;
   helpText: string | null;
-  questionType: string;
+  questionType: QuestionnaireQuestionType;
   required: boolean;
   sortOrder: number;
-  config: QuestionnaireAnswerValue | null;
+  config: QuestionnaireQuestionConfig;
 };
 
 export type QuestionnaireSection = {

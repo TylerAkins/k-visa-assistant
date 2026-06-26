@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { FormMessage } from "@/features/auth/components/form-message";
 import type { CaseOverviewData } from "@/features/cases/types";
 import { kVisaCountryOptions } from "@/features/cases/types/k-visa-countries";
+import { QuestionnaireWorkflow } from "@/features/questionnaire/components/questionnaire";
+import type { QuestionnaireForCase } from "@/features/questionnaire/types";
 import { cn } from "@/lib/utils";
 
 type CaseActionState = {
@@ -132,12 +134,15 @@ function EmptyStateCard({
 
 export function CaseEditor({
   overview,
+  questionnaire,
   updateCaseTitleAction,
   savePetitionerAction,
   saveBeneficiaryAction,
   saveChildrenAction,
+  saveQuestionnaireSectionAction,
 }: {
   overview: CaseOverviewData;
+  questionnaire: QuestionnaireForCase;
   updateCaseTitleAction: (
     caseId: string,
     formData: FormData,
@@ -152,6 +157,11 @@ export function CaseEditor({
   ) => Promise<CaseActionState>;
   saveChildrenAction: (
     caseId: string,
+    formData: FormData,
+  ) => Promise<CaseActionState>;
+  saveQuestionnaireSectionAction: (
+    caseId: string,
+    sectionKey: string,
     formData: FormData,
   ) => Promise<CaseActionState>;
 }) {
@@ -201,6 +211,11 @@ export function CaseEditor({
         childRecords={overview.children}
         saveAction={saveChildrenAction}
         onProgressChange={setProgressPercent}
+      />
+      <QuestionnaireWorkflow
+        caseId={overview.case.id}
+        questionnaire={questionnaire}
+        saveSectionAction={saveQuestionnaireSectionAction}
       />
       <FutureFeaturePlaceholders />
     </div>
@@ -701,11 +716,7 @@ function SelectGroup({
 
 export function FutureFeaturePlaceholders() {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <EmptyStateCard
-        title="Questionnaire"
-        description="This workflow will connect in a later phase."
-      />
+    <div className="grid gap-4 md:grid-cols-2">
       <EmptyStateCard
         title="Evidence"
         description="Evidence uploads are intentionally disabled for now."

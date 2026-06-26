@@ -8,6 +8,8 @@ import {
 } from "@/features/cases/actions";
 import { CaseEditor } from "@/features/cases/components/forms";
 import { getCaseOverview } from "@/features/cases/server/cases";
+import { saveQuestionnaireSectionAction } from "@/features/questionnaire/actions";
+import { getQuestionnaireForCase } from "@/features/questionnaire/server/questionnaire";
 
 export default async function CaseOverviewPage({
   params,
@@ -21,13 +23,17 @@ export default async function CaseOverviewPage({
     notFound();
   }
 
+  const questionnaire = await getQuestionnaireForCase(caseId);
+
   return (
     <CaseEditor
       overview={overview}
+      questionnaire={questionnaire}
       updateCaseTitleAction={updateCaseTitleAction}
       savePetitionerAction={savePetitionerAction}
       saveBeneficiaryAction={saveBeneficiaryAction}
       saveChildrenAction={saveChildrenAction}
+      saveQuestionnaireSectionAction={saveQuestionnaireSectionAction}
     />
   );
 }
