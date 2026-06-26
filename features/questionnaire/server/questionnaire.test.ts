@@ -8,6 +8,7 @@ const { mockAssertCaseOwnership, mockDb } = vi.hoisted(() => ({
     select: vi.fn(),
     insert: vi.fn(),
     delete: vi.fn(),
+    transaction: vi.fn(),
   },
 }));
 
@@ -24,7 +25,6 @@ import {
   listQuestionnaireDefinition,
   saveQuestionnaireSectionAnswers,
   updateQuestionnaireCaseState,
-  upsertQuestionnaireAnswer,
 } from "@/features/questionnaire/server/questionnaire";
 
 function createSelectQuery<T>(rows: T[]) {
@@ -55,12 +55,28 @@ function createInsertQuery<T>(rows: T[]) {
   };
 }
 
-function createDeleteQuery() {
-  const where = vi.fn(() => Promise.resolve());
+function createTransactionQuery() {
+  const deleteWhere = vi.fn(() => Promise.resolve());
+  const deleteAnswer = vi.fn(() => ({ where: deleteWhere }));
+  const onConflictDoUpdate = vi.fn(() => Promise.resolve());
+  const values = vi.fn(() => ({ onConflictDoUpdate }));
+  const insertAnswer = vi.fn(() => ({ values }));
+
+  mockDb.transaction.mockImplementationOnce(
+    async (
+      callback: (tx: {
+        delete: typeof deleteAnswer;
+        insert: typeof insertAnswer;
+      }) => Promise<void>,
+    ) => callback({ delete: deleteAnswer, insert: insertAnswer }),
+  );
 
   return {
-    query: { where },
-    where,
+    deleteAnswer,
+    deleteWhere,
+    insertAnswer,
+    onConflictDoUpdate,
+    values,
   };
 }
 
@@ -148,20 +164,15 @@ describe("questionnaire data access", () => {
 
   it("creates and reads answers for an owned case", async () => {
     const savedAt = new Date("2026-02-01T00:00:00.000Z");
-    const insertQuery = createInsertQuery([
-      {
-        id: "answer-1",
-        caseId: "case-1",
-        questionId: "question-1",
-        value: true,
-        createdAt: savedAt,
-        updatedAt: savedAt,
-      },
-    ]);
+    const transaction = createTransactionQuery();
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
 
     mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([petitionerSection]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]))
       .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
       .mockReturnValueOnce(
@@ -177,16 +188,18 @@ describe("questionnaire data access", () => {
         ]),
       )
       .mockReturnValueOnce(createSelectQuery([]));
-    mockDb.insert.mockReturnValueOnce(insertQuery.query);
 
     await expect(
-      upsertQuestionnaireAnswer("case-1", "met_in_person", true),
-    ).resolves.toMatchObject({
-      caseId: "case-1",
-      questionId: "question-1",
-      questionKey: "met_in_person",
-      value: true,
-    });
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({ success: true });
+
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: "case-1",
+        questionId: "question-1",
+        value: true,
+      }),
+    );
 
     const questionnaire = await getQuestionnaireForCase("case-1");
 
@@ -207,45 +220,40 @@ describe("questionnaire data access", () => {
   });
 
   it("upserts answers instead of inserting duplicate case/question rows", async () => {
-    const updatedAt = new Date("2026-02-01T00:00:00.000Z");
-    const insertQuery = createInsertQuery([
-      {
-        id: "answer-1",
-        caseId: "case-1",
-        questionId: "question-1",
-        value: "updated",
-        createdAt: updatedAt,
-        updatedAt,
-      },
-    ]);
+    const transaction = createTransactionQuery();
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const formData = new FormData();
+    formData.set("met_in_person", "false");
 
     mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
-    mockDb.insert.mockReturnValueOnce(insertQuery.query);
+      .mockReturnValueOnce(
+        createSelectQuery([
+          {
+            id: "answer-1",
+            caseId: "case-1",
+            questionId: "question-1",
+            value: true,
+            createdAt: savedAt,
+            updatedAt: savedAt,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(createSelectQuery([]));
 
-    await upsertQuestionnaireAnswer("case-1", "met_in_person", "updated");
+    await saveQuestionnaireSectionAnswers("case-1", "petitioner", formData);
 
-    expect(insertQuery.onConflictDoUpdate).toHaveBeenCalledTimes(1);
-    expect(insertQuery.onConflictDoUpdate).toHaveBeenCalledWith(
+    expect(transaction.onConflictDoUpdate).toHaveBeenCalledTimes(1);
+    expect(transaction.onConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        set: expect.objectContaining({ value: "updated" }),
+        set: expect.objectContaining({ value: false }),
       }),
     );
   });
 
   it("saves section answers using stable question keys", async () => {
-    const savedAt = new Date("2026-02-01T00:00:00.000Z");
-    const insertQuery = createInsertQuery([
-      {
-        id: "answer-1",
-        caseId: "case-1",
-        questionId: "question-1",
-        value: true,
-        createdAt: savedAt,
-        updatedAt: savedAt,
-      },
-    ]);
+    const transaction = createTransactionQuery();
     const formData = new FormData();
     formData.set("met_in_person", "true");
 
@@ -253,16 +261,13 @@ describe("questionnaire data access", () => {
       .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(createSelectQuery([activeQuestion]))
       .mockReturnValueOnce(createSelectQuery([]))
-      .mockReturnValueOnce(createSelectQuery([]))
-      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
-    mockDb.insert.mockReturnValueOnce(insertQuery.query);
+      .mockReturnValueOnce(createSelectQuery([]));
 
     await expect(
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
     ).resolves.toEqual({ success: true });
 
-    expect(insertQuery.values).toHaveBeenCalledWith(
+    expect(transaction.values).toHaveBeenCalledWith(
       expect.objectContaining({
         caseId: "case-1",
         questionId: "question-1",
@@ -290,7 +295,7 @@ describe("questionnaire data access", () => {
       },
     });
 
-    expect(mockDb.insert).not.toHaveBeenCalled();
+    expect(mockDb.transaction).not.toHaveBeenCalled();
   });
 
   it("does not partially save earlier answers when a later answer is invalid", async () => {
@@ -326,7 +331,7 @@ describe("questionnaire data access", () => {
       },
     });
 
-    expect(mockDb.insert).not.toHaveBeenCalled();
+    expect(mockDb.transaction).not.toHaveBeenCalled();
   });
 
   it("does not clear hidden answers when another visible answer is invalid", async () => {
@@ -367,23 +372,11 @@ describe("questionnaire data access", () => {
       },
     });
 
-    expect(mockDb.delete).not.toHaveBeenCalled();
-    expect(mockDb.insert).not.toHaveBeenCalled();
+    expect(mockDb.transaction).not.toHaveBeenCalled();
   });
 
   it("does not require hidden conditional questions", async () => {
-    const savedAt = new Date("2026-02-01T00:00:00.000Z");
-    const insertQuery = createInsertQuery([
-      {
-        id: "answer-1",
-        caseId: "case-1",
-        questionId: "question-1",
-        value: true,
-        createdAt: savedAt,
-        updatedAt: savedAt,
-      },
-    ]);
-    const deleteQuery = createDeleteQuery();
+    const transaction = createTransactionQuery();
     const formData = new FormData();
     formData.set("met_in_person", "true");
 
@@ -391,18 +384,14 @@ describe("questionnaire data access", () => {
       .mockReturnValueOnce(createSelectQuery(completeSections))
       .mockReturnValueOnce(createSelectQuery([activeQuestion, waiverQuestion]))
       .mockReturnValueOnce(createSelectQuery([]))
-      .mockReturnValueOnce(createSelectQuery([]))
-      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
-    mockDb.delete.mockReturnValueOnce(deleteQuery.query);
-    mockDb.insert.mockReturnValueOnce(insertQuery.query);
+      .mockReturnValueOnce(createSelectQuery([]));
 
     await expect(
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
     ).resolves.toEqual({ success: true });
 
-    expect(deleteQuery.where).toHaveBeenCalledTimes(1);
-    expect(insertQuery.values).toHaveBeenCalledWith(
+    expect(transaction.deleteWhere).toHaveBeenCalledTimes(1);
+    expect(transaction.values).toHaveBeenCalledWith(
       expect.objectContaining({
         caseId: "case-1",
         questionId: "question-1",
@@ -432,8 +421,7 @@ describe("questionnaire data access", () => {
       },
     });
 
-    expect(mockDb.delete).not.toHaveBeenCalled();
-    expect(mockDb.insert).not.toHaveBeenCalled();
+    expect(mockDb.transaction).not.toHaveBeenCalled();
   });
 
   it("clears stale hidden answers and ignores hidden posted values", async () => {
@@ -443,17 +431,7 @@ describe("questionnaire data access", () => {
       questionType: "date",
     };
     const savedAt = new Date("2026-02-01T00:00:00.000Z");
-    const insertQuery = createInsertQuery([
-      {
-        id: "answer-1",
-        caseId: "case-1",
-        questionId: "question-1",
-        value: true,
-        createdAt: savedAt,
-        updatedAt: savedAt,
-      },
-    ]);
-    const deleteQuery = createDeleteQuery();
+    const transaction = createTransactionQuery();
     const formData = new FormData();
     formData.set("met_in_person", "true");
     formData.set("meeting_waiver_explanation", "not-a-date");
@@ -473,18 +451,14 @@ describe("questionnaire data access", () => {
           },
         ]),
       )
-      .mockReturnValueOnce(createSelectQuery([]))
-      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([petitionerSection]));
-    mockDb.delete.mockReturnValueOnce(deleteQuery.query);
-    mockDb.insert.mockReturnValueOnce(insertQuery.query);
+      .mockReturnValueOnce(createSelectQuery([]));
 
     await expect(
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
     ).resolves.toEqual({ success: true });
 
-    expect(deleteQuery.where).toHaveBeenCalledTimes(1);
-    expect(insertQuery.values).toHaveBeenCalledWith(
+    expect(transaction.deleteWhere).toHaveBeenCalledTimes(1);
+    expect(transaction.values).toHaveBeenCalledWith(
       expect.objectContaining({
         questionId: "question-1",
         value: true,
@@ -500,6 +474,21 @@ describe("questionnaire data access", () => {
     );
 
     expect(mockDb.select).not.toHaveBeenCalled();
+  });
+
+  it("rejects unowned cases before writing questionnaire data", async () => {
+    mockAssertCaseOwnership.mockRejectedValueOnce(new Error("Unauthorized"));
+
+    await expect(
+      saveQuestionnaireSectionAnswers(
+        "case-2",
+        "petitioner",
+        new FormData(),
+      ),
+    ).rejects.toThrow("Unauthorized");
+
+    expect(mockDb.select).not.toHaveBeenCalled();
+    expect(mockDb.transaction).not.toHaveBeenCalled();
   });
 
   it("creates review state for an owned case", async () => {
@@ -564,28 +553,6 @@ describe("questionnaire data access", () => {
         updatedAt: reviewedAt,
       },
     });
-  });
-
-  it("does not write answers for inactive or missing questions", async () => {
-    mockDb.select.mockReturnValueOnce(createSelectQuery([]));
-
-    await expect(
-      upsertQuestionnaireAnswer("case-1", "inactive_question", "value"),
-    ).rejects.toThrow("Questionnaire question not found.");
-
-    expect(mockDb.insert).not.toHaveBeenCalled();
-  });
-
-  it("does not write answers for questions in inactive sections", async () => {
-    mockDb.select
-      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
-      .mockReturnValueOnce(createSelectQuery([]));
-
-    await expect(
-      upsertQuestionnaireAnswer("case-1", "met_in_person", "value"),
-    ).rejects.toThrow("Questionnaire question not found.");
-
-    expect(mockDb.insert).not.toHaveBeenCalled();
   });
 
   it("orders active questionnaire sections by registry order", async () => {
