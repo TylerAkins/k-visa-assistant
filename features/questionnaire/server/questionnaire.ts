@@ -10,7 +10,6 @@ import {
   questionnaireSections,
 } from "@/db/schema";
 import { assertCaseOwnership } from "@/features/cases/server/cases";
-import { isQuestionVisible } from "@/features/questionnaire/conditions";
 import {
   assertCompleteQuestionnaireSectionIds,
   getQuestionnaireSectionMetadata,
@@ -25,7 +24,9 @@ import type {
   QuestionnaireQuestion,
   QuestionnaireReviewStatus,
   QuestionnaireSection,
+  QuestionnaireSectionSaveResult,
 } from "@/features/questionnaire/types";
+import { validateQuestionnaireSectionAnswers } from "@/features/questionnaire/validation/answers";
 import {
   parseQuestionnaireQuestionConfig,
   parseQuestionnaireQuestionType,
@@ -250,7 +251,7 @@ export async function saveQuestionnaireSectionAnswers(
   caseId: string,
   sectionKey: string,
   formData: FormData,
-) {
+): Promise<QuestionnaireSectionSaveResult> {
   const questionnaire = await getQuestionnaireForCase(caseId);
   const section = questionnaire.sections.find((item) => item.key === sectionKey);
 
@@ -258,41 +259,23 @@ export async function saveQuestionnaireSectionAnswers(
     throw new Error("Questionnaire section not found.");
   }
 
-  const parsedAnswers: { questionKey: string; value: QuestionnaireAnswerValue }[] = [];
-  const hiddenQuestionIds: string[] = [];
-  const answersByQuestionKey = new Map(
-    questionnaire.answers.map((answer) => [answer.questionKey, answer.value]),
+  const validationResult = validateQuestionnaireSectionAnswers(
+    section,
+    new Map(
+      questionnaire.answers.map((answer) => [answer.questionKey, answer.value]),
+    ),
+    formData,
   );
 
-  for (const question of section.questions) {
-    if (!isQuestionVisible(question, answersByQuestionKey)) {
-      hiddenQuestionIds.push(question.id);
-      answersByQuestionKey.delete(question.key);
-      continue;
-    }
-
-    const parsedValue = parseQuestionnaireFormValue(question, formData);
-
-    if (!parsedValue.success) {
-      return { success: false, error: parsedValue.error };
-    }
-
-    if (question.required && parsedValue.value === null) {
-      return {
-        success: false,
-        error: `Please answer "${question.label}" before saving.`,
-      };
-    }
-
-    parsedAnswers.push({ questionKey: question.key, value: parsedValue.value });
-    answersByQuestionKey.set(question.key, parsedValue.value);
+  if (!validationResult.success) {
+    return validationResult;
   }
 
-  for (const questionId of hiddenQuestionIds) {
+  for (const questionId of validationResult.hiddenQuestionIds) {
     await deleteQuestionnaireAnswer(caseId, questionId);
   }
 
-  for (const answer of parsedAnswers) {
+  for (const answer of validationResult.answers) {
     await upsertQuestionnaireAnswer(caseId, answer.questionKey, answer.value);
   }
 
@@ -343,72 +326,4 @@ export async function updateQuestionnaireCaseState(
   }
 
   return mapCaseState(state);
-}
-
-function parseQuestionnaireFormValue(
-  question: QuestionnaireQuestion,
-  formData: FormData,
-):
-  | { success: true; value: QuestionnaireAnswerValue }
-  | { success: false; error: string } {
-  const rawValue = formData.get(question.key);
-  const value = typeof rawValue === "string" ? rawValue.trim() : "";
-
-  switch (question.questionType) {
-    case "text":
-    case "textarea":
-      return { success: true, value: value || null };
-    case "date":
-      if (!value) {
-        return { success: true, value: null };
-      }
-
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        return {
-          success: false,
-          error: `Enter a valid date for "${question.label}".`,
-        };
-      }
-
-      return { success: true, value };
-    case "boolean":
-      if (!value) {
-        return { success: true, value: null };
-      }
-
-      if (value === "true") {
-        return { success: true, value: true };
-      }
-
-      if (value === "false") {
-        return { success: true, value: false };
-      }
-
-      return {
-        success: false,
-        error: `Choose yes or no for "${question.label}".`,
-      };
-    case "select": {
-      if (!value) {
-        return { success: true, value: null };
-      }
-
-      const option = question.config?.options?.find(
-        (item) => item.value === value,
-      );
-
-      if (!option) {
-        return {
-          success: false,
-          error: `Choose a valid option for "${question.label}".`,
-        };
-      }
-
-      return { success: true, value };
-    }
-    default: {
-      const unsupportedType: never = question.questionType;
-      throw new Error(`Unsupported questionnaire question type: ${unsupportedType}.`);
-    }
-  }
 }

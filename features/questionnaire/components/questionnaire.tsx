@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FormMessage } from "@/features/auth/components/form-message";
 import { isQuestionVisible } from "@/features/questionnaire/conditions";
 import type {
   QuestionnaireAnswer,
@@ -20,19 +19,15 @@ import type {
   QuestionnaireForCase,
   QuestionnaireQuestion,
   QuestionnaireSection,
+  QuestionnaireSectionSaveResult,
 } from "@/features/questionnaire/types";
 import { cn } from "@/lib/utils";
-
-type QuestionnaireActionState = {
-  success: boolean;
-  error?: string;
-};
 
 type SaveQuestionnaireSectionAction = (
   caseId: string,
   sectionKey: string,
   formData: FormData,
-) => Promise<QuestionnaireActionState>;
+) => Promise<QuestionnaireSectionSaveResult>;
 
 export function QuestionnaireWorkflow({
   caseId,
@@ -80,9 +75,9 @@ function QuestionnaireSectionForm({
   action: SaveQuestionnaireSectionAction;
 }) {
   const [state, formAction, pending] = useActionState(
-    async (_state: QuestionnaireActionState, formData: FormData) =>
+    async (_state: QuestionnaireSectionSaveResult, formData: FormData) =>
       action(caseId, section.key, formData),
-    { success: false },
+    { success: false, fieldErrors: {} },
   );
   const [answersByQuestionKey, setAnswersByQuestionKey] = useState(
     () =>
@@ -115,7 +110,6 @@ function QuestionnaireSectionForm({
         ) : null}
       </CardHeader>
       <CardContent>
-        <FormMessage message={state.error} />
         <form action={formAction} className="space-y-4">
           {visibleQuestions.length > 0 ? (
             visibleQuestions.map((question) => (
@@ -123,6 +117,11 @@ function QuestionnaireSectionForm({
                 key={question.key}
                 question={question}
                 value={answersByQuestionKey.get(question.key)}
+                error={
+                  state.success
+                    ? undefined
+                    : state.fieldErrors[question.key]?.[0]
+                }
                 onValueChange={(value) => updateAnswer(question.key, value)}
               />
             ))
@@ -140,16 +139,21 @@ function QuestionnaireSectionForm({
   );
 }
 
-function QuestionField({
+export function QuestionField({
   question,
   value,
+  error,
   onValueChange,
 }: {
   question: QuestionnaireQuestion;
   value: QuestionnaireAnswerValue | undefined;
+  error?: string;
   onValueChange: (value: QuestionnaireAnswerValue) => void;
 }) {
   const fieldId = `question-${question.key}`;
+  const helpId = question.helpText ? `${fieldId}-help` : undefined;
+  const errorId = error ? `${fieldId}-error` : undefined;
+  const describedBy = [helpId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className="space-y-2">
@@ -158,14 +162,23 @@ function QuestionField({
         {question.required ? <span className="text-destructive">*</span> : null}
       </Label>
       {question.helpText ? (
-        <p className="text-sm text-muted-foreground">{question.helpText}</p>
+        <p id={helpId} className="text-sm text-muted-foreground">
+          {question.helpText}
+        </p>
       ) : null}
       <QuestionInput
         id={fieldId}
         question={question}
         value={value}
+        invalid={Boolean(error)}
+        describedBy={describedBy}
         onValueChange={onValueChange}
       />
+      {error ? (
+        <p id={errorId} className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -174,11 +187,15 @@ function QuestionInput({
   id,
   question,
   value,
+  invalid,
+  describedBy,
   onValueChange,
 }: {
   id: string;
   question: QuestionnaireQuestion;
   value: QuestionnaireAnswerValue | undefined;
+  invalid: boolean;
+  describedBy?: string;
   onValueChange: (value: QuestionnaireAnswerValue) => void;
 }) {
   switch (question.questionType) {
@@ -190,6 +207,8 @@ function QuestionInput({
           value={stringAnswerValue(value)}
           onChange={(event) => onValueChange(event.currentTarget.value || null)}
           required={question.required}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
         />
       );
     case "date":
@@ -201,6 +220,8 @@ function QuestionInput({
           value={stringAnswerValue(value)}
           onChange={(event) => onValueChange(event.currentTarget.value || null)}
           required={question.required}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
         />
       );
     case "textarea":
@@ -211,6 +232,8 @@ function QuestionInput({
           value={stringAnswerValue(value)}
           onChange={(event) => onValueChange(event.currentTarget.value || null)}
           required={question.required}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           className={cn(
             "min-h-28 w-full min-w-0 rounded-md border border-input bg-input/30 px-3 py-2 text-sm text-foreground shadow-inner outline-none transition-colors hover:border-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50",
           )}
@@ -236,6 +259,8 @@ function QuestionInput({
             onValueChange(null);
           }}
           required={question.required}
+          invalid={invalid}
+          describedBy={describedBy}
           options={[
             { label: "Yes", value: "true" },
             { label: "No", value: "false" },
@@ -250,6 +275,8 @@ function QuestionInput({
           value={stringAnswerValue(value)}
           onValueChange={(nextValue) => onValueChange(nextValue || null)}
           required={question.required}
+          invalid={invalid}
+          describedBy={describedBy}
           options={question.config?.options ?? []}
         />
       );
@@ -267,6 +294,8 @@ function SelectControl({
   value,
   onValueChange,
   required,
+  invalid,
+  describedBy,
 }: {
   id: string;
   name: string;
@@ -274,6 +303,8 @@ function SelectControl({
   value: string;
   onValueChange: (value: string) => void;
   required: boolean;
+  invalid: boolean;
+  describedBy?: string;
 }) {
   return (
     <div className="relative">
@@ -283,6 +314,8 @@ function SelectControl({
         value={value}
         onChange={(event) => onValueChange(event.currentTarget.value)}
         required={required}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
         className={cn(
           "h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-input/30 px-3 pr-9 text-sm text-foreground shadow-inner outline-none transition-colors hover:border-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50",
         )}

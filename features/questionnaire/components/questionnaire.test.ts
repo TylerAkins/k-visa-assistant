@@ -2,7 +2,10 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { QuestionnaireWorkflow } from "@/features/questionnaire/components/questionnaire";
+import {
+  QuestionField,
+  QuestionnaireWorkflow,
+} from "@/features/questionnaire/components/questionnaire";
 import type { QuestionnaireForCase } from "@/features/questionnaire/types";
 
 const questionnaire = {
@@ -143,5 +146,24 @@ describe("QuestionnaireWorkflow", () => {
 
     expect(html).not.toContain("Meeting waiver explanation");
     expect(html).not.toContain('name="meeting_waiver_explanation"');
+  });
+
+  it("renders field errors with accessible input associations", () => {
+    const question = questionnaire.sections[0].questions[1];
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionField, {
+        question,
+        value: "Invalid answer",
+        error: "Enter a valid response.",
+        onValueChange: () => undefined,
+      }),
+    );
+
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain(
+      'aria-describedby="question-relationship_history-help question-relationship_history-error"',
+    );
+    expect(html).toContain('id="question-relationship_history-error"');
+    expect(html).toContain("Enter a valid response.");
   });
 });

@@ -83,3 +83,9 @@ export type QuestionnaireForCase = {
   answers: QuestionnaireAnswer[];
   state: QuestionnaireCaseState | null;
 };
+
+export type QuestionnaireFieldErrors = Record<string, string[]>;
+
+export type QuestionnaireSectionSaveResult =
+  | { success: true }
+  | { success: false; fieldErrors: QuestionnaireFieldErrors };

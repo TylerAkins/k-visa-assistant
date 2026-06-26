@@ -285,7 +285,9 @@ describe("questionnaire data access", () => {
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
     ).resolves.toEqual({
       success: false,
-      error: 'Choose yes or no for "Have you met in person?".',
+      fieldErrors: {
+        met_in_person: ['Choose yes or no for "Have you met in person?".'],
+      },
     });
 
     expect(mockDb.insert).not.toHaveBeenCalled();
@@ -317,9 +319,55 @@ describe("questionnaire data access", () => {
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
     ).resolves.toEqual({
       success: false,
-      error: 'Choose a valid option for "Citizenship basis".',
+      fieldErrors: {
+        citizenship_basis: [
+          'Choose a valid option for "Citizenship basis".',
+        ],
+      },
     });
 
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("does not clear hidden answers when another visible answer is invalid", async () => {
+    const requiredSelectQuestion = {
+      ...activeQuestion,
+      id: "question-select",
+      key: "citizenship_basis",
+      label: "Citizenship basis",
+      questionType: "select",
+      sortOrder: 3,
+      config: {
+        options: [{ label: "Naturalization", value: "naturalization" }],
+      },
+    };
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(
+        createSelectQuery([
+          activeQuestion,
+          waiverQuestion,
+          requiredSelectQuestion,
+        ]),
+      )
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({
+      success: false,
+      fieldErrors: {
+        citizenship_basis: [
+          'Please answer "Citizenship basis" before saving.',
+        ],
+      },
+    });
+
+    expect(mockDb.delete).not.toHaveBeenCalled();
     expect(mockDb.insert).not.toHaveBeenCalled();
   });
 
@@ -377,7 +425,11 @@ describe("questionnaire data access", () => {
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
     ).resolves.toEqual({
       success: false,
-      error: 'Please answer "Meeting waiver explanation" before saving.',
+      fieldErrors: {
+        meeting_waiver_explanation: [
+          'Please answer "Meeting waiver explanation" before saving.',
+        ],
+      },
     });
 
     expect(mockDb.delete).not.toHaveBeenCalled();
