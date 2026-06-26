@@ -28,7 +28,16 @@ describe("questionnaire server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     assertCaseOwnershipMock.mockResolvedValue({ id: "case-1", userId: "user-1" });
-    saveQuestionnaireSectionAnswersMock.mockResolvedValue({ success: true });
+    saveQuestionnaireSectionAnswersMock.mockResolvedValue({
+      success: true,
+      progressPercent: 78,
+      questionnaireProgress: {
+        completedSections: 1,
+        totalSections: 4,
+        percent: 25,
+        sections: [],
+      },
+    });
   });
 
   it("checks ownership before saving section answers", async () => {
@@ -36,7 +45,7 @@ describe("questionnaire server actions", () => {
 
     await expect(
       saveQuestionnaireSectionAction("case-1", "relationship", formData),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toMatchObject({ success: true, progressPercent: 78 });
 
     expect(assertCaseOwnershipMock).toHaveBeenCalledWith("case-1");
     expect(saveQuestionnaireSectionAnswersMock).toHaveBeenCalledWith(
@@ -45,6 +54,7 @@ describe("questionnaire server actions", () => {
       formData,
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/cases/case-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
   });
 
   it("does not revalidate when section validation fails", async () => {

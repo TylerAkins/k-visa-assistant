@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockAssertCaseOwnership, mockDb } = vi.hoisted(() => ({
+const { mockAssertCaseOwnership, mockDb, mockUpdateCaseProgress } = vi.hoisted(() => ({
   mockAssertCaseOwnership: vi.fn(),
+  mockUpdateCaseProgress: vi.fn(),
   mockDb: {
     select: vi.fn(),
     insert: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/features/cases/server/cases", () => ({
   assertCaseOwnership: mockAssertCaseOwnership,
+  updateCaseProgress: mockUpdateCaseProgress,
 }));
 
 import {
@@ -160,6 +162,7 @@ describe("questionnaire data access", () => {
       id: "case-1",
       userId: "user-1",
     });
+    mockUpdateCaseProgress.mockResolvedValue({ progressPercent: 78 });
   });
 
   it("creates and reads answers for an owned case", async () => {
@@ -191,7 +194,15 @@ describe("questionnaire data access", () => {
 
     await expect(
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toMatchObject({
+      success: true,
+      progressPercent: 78,
+      questionnaireProgress: {
+        completedSections: 1,
+        totalSections: 4,
+        percent: 25,
+      },
+    });
 
     expect(transaction.values).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -200,6 +211,7 @@ describe("questionnaire data access", () => {
         value: true,
       }),
     );
+    expect(mockUpdateCaseProgress).toHaveBeenCalledWith("case-1", 0.25);
 
     const questionnaire = await getQuestionnaireForCase("case-1");
 
@@ -217,6 +229,100 @@ describe("questionnaire data access", () => {
       }),
     ]);
     expect(questionnaire.state).toBeNull();
+    expect(questionnaire.progress).toMatchObject({
+      completedSections: 1,
+      totalSections: 4,
+      percent: 25,
+    });
+  });
+
+  it("sets questionnaire completion and full case progress when all sections complete", async () => {
+    const transaction = createTransactionQuery();
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
+    const optionalQuestions = [
+      ["section-beneficiary", "beneficiary_notes"],
+      ["section-relationship", "relationship_notes"],
+      ["section-children", "children_notes"],
+    ].map(([sectionId, key], index) => ({
+      ...activeQuestion,
+      id: `question-${index + 2}`,
+      sectionId,
+      key,
+      label: key,
+      questionType: "text",
+      required: false,
+      sortOrder: 1,
+    }));
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+
+    mockUpdateCaseProgress.mockResolvedValueOnce({ progressPercent: 100 });
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(
+        createSelectQuery([activeQuestion, ...optionalQuestions]),
+      )
+      .mockReturnValueOnce(
+        createSelectQuery(
+          optionalQuestions.map((question) => ({
+            id: `answer-${question.id}`,
+            caseId: "case-1",
+            questionId: question.id,
+            value: null,
+            createdAt: savedAt,
+            updatedAt: savedAt,
+          })),
+        ),
+      )
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toMatchObject({
+      success: true,
+      progressPercent: 100,
+      questionnaireProgress: { completedSections: 4, percent: 100 },
+    });
+
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: "case-1",
+        completedAt: expect.any(Date),
+        reviewStatus: "not_started",
+      }),
+    );
+    expect(mockUpdateCaseProgress).toHaveBeenCalledWith("case-1", 1);
+  });
+
+  it("clears stale questionnaire completion when sections are incomplete", async () => {
+    const transaction = createTransactionQuery();
+    const formData = new FormData();
+    formData.set("met_in_person", "true");
+    const completedAt = new Date("2026-02-01T00:00:00.000Z");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(
+        createSelectQuery([
+          {
+            id: "state-1",
+            caseId: "case-1",
+            completedAt,
+            reviewedAt: null,
+            reviewStatus: "not_started",
+            createdAt: completedAt,
+            updatedAt: completedAt,
+          },
+        ]),
+      );
+
+    await saveQuestionnaireSectionAnswers("case-1", "petitioner", formData);
+
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({ caseId: "case-1", completedAt: null }),
+    );
   });
 
   it("upserts answers instead of inserting duplicate case/question rows", async () => {
@@ -244,7 +350,7 @@ describe("questionnaire data access", () => {
 
     await saveQuestionnaireSectionAnswers("case-1", "petitioner", formData);
 
-    expect(transaction.onConflictDoUpdate).toHaveBeenCalledTimes(1);
+    expect(transaction.onConflictDoUpdate).toHaveBeenCalledTimes(2);
     expect(transaction.onConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         set: expect.objectContaining({ value: false }),
@@ -265,7 +371,7 @@ describe("questionnaire data access", () => {
 
     await expect(
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toMatchObject({ success: true, progressPercent: 78 });
 
     expect(transaction.values).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -388,7 +494,7 @@ describe("questionnaire data access", () => {
 
     await expect(
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toMatchObject({ success: true, progressPercent: 78 });
 
     expect(transaction.deleteWhere).toHaveBeenCalledTimes(1);
     expect(transaction.values).toHaveBeenCalledWith(
@@ -455,7 +561,7 @@ describe("questionnaire data access", () => {
 
     await expect(
       saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toMatchObject({ success: true, progressPercent: 78 });
 
     expect(transaction.deleteWhere).toHaveBeenCalledTimes(1);
     expect(transaction.values).toHaveBeenCalledWith(

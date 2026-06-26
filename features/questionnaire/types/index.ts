@@ -1,3 +1,5 @@
+import type { QuestionnaireSectionId } from "@/features/questionnaire/sections";
+
 export const questionnaireQuestionTypes = [
   "text",
   "textarea",
@@ -55,11 +57,23 @@ export type QuestionnaireQuestion = {
 
 export type QuestionnaireSection = {
   id: string;
-  key: string;
+  key: QuestionnaireSectionId;
   title: string;
   description: string | null;
   sortOrder: number;
   questions: QuestionnaireQuestion[];
+};
+
+export type QuestionnaireSectionProgress = {
+  sectionKey: QuestionnaireSectionId;
+  complete: boolean;
+};
+
+export type QuestionnaireProgress = {
+  completedSections: number;
+  totalSections: number;
+  percent: number;
+  sections: QuestionnaireSectionProgress[];
 };
 
 export type QuestionnaireAnswer = {
@@ -82,10 +96,15 @@ export type QuestionnaireForCase = {
   sections: QuestionnaireSection[];
   answers: QuestionnaireAnswer[];
   state: QuestionnaireCaseState | null;
+  progress: QuestionnaireProgress;
 };
 
 export type QuestionnaireFieldErrors = Record<string, string[]>;
 
 export type QuestionnaireSectionSaveResult =
-  | { success: true }
+  | {
+      success: true;
+      progressPercent: number;
+      questionnaireProgress: QuestionnaireProgress;
+    }
   | { success: false; fieldErrors: QuestionnaireFieldErrors };

@@ -7,7 +7,10 @@ import {
   updateCaseTitleAction,
 } from "@/features/cases/actions";
 import { CaseEditor } from "@/features/cases/components/forms";
-import { getCaseOverview } from "@/features/cases/server/cases";
+import {
+  CaseAccessError,
+  getCaseOverview,
+} from "@/features/cases/server/cases";
 import { saveQuestionnaireSectionAction } from "@/features/questionnaire/actions";
 import { getQuestionnaireForCase } from "@/features/questionnaire/server/questionnaire";
 
@@ -17,13 +20,22 @@ export default async function CaseOverviewPage({
   params: Promise<{ caseId: string }>;
 }) {
   const { caseId } = await params;
-  const overview = await getCaseOverview(caseId).catch(() => null);
+  let questionnaire;
 
-  if (!overview) {
-    notFound();
+  try {
+    questionnaire = await getQuestionnaireForCase(caseId);
+  } catch (error) {
+    if (error instanceof CaseAccessError) {
+      notFound();
+    }
+
+    throw error;
   }
 
-  const questionnaire = await getQuestionnaireForCase(caseId);
+  const overview = await getCaseOverview(
+    caseId,
+    questionnaire.progress.percent / 100,
+  );
 
   return (
     <CaseEditor

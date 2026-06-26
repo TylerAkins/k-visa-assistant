@@ -76,7 +76,7 @@ function validationError(question: QuestionnaireQuestion) {
 
 export function parseQuestionnaireAnswer(
   question: QuestionnaireQuestion,
-  rawValue: FormDataEntryValue | null,
+  rawValue: unknown,
 ): ParsedAnswer {
   const schema = (() => {
     switch (question.questionType) {

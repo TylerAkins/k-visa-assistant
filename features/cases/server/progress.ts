@@ -2,7 +2,7 @@ import type { ProgressState } from "@/features/cases/types";
 
 const PERSON_SECTION_WEIGHT = 30;
 const CHILDREN_SECTION_WEIGHT = 10;
-const QUESTIONNAIRE_READY_WEIGHT = 30;
+const QUESTIONNAIRE_WEIGHT = 30;
 
 type PersonProgressFields = {
   firstName: string | null;
@@ -32,11 +32,17 @@ export function calculateCaseProgress(state: ProgressState): number {
     progress += CHILDREN_SECTION_WEIGHT;
   }
 
-  if (state.readyForQuestionnaire) {
-    progress += QUESTIONNAIRE_READY_WEIGHT;
-  }
+  progress += calculateQuestionnaireProgressContribution(
+    state.questionnaireCompletionRatio,
+  );
 
   return Math.min(100, progress);
+}
+
+export function calculateQuestionnaireProgressContribution(
+  completionRatio: number,
+): number {
+  return Math.round(completionRatio * QUESTIONNAIRE_WEIGHT);
 }
 
 function hasValue(value: Date | string | null | undefined) {
@@ -71,11 +77,13 @@ export function getCaseProgressState({
   beneficiary,
   childrenCount,
   childrenReviewed,
+  questionnaireCompletionRatio = 0,
 }: {
   petitioner: PersonProgressFields;
   beneficiary: PersonProgressFields;
   childrenCount: number;
   childrenReviewed: boolean;
+  questionnaireCompletionRatio?: number;
 }): ProgressState {
   const petitionerCompletionRatio = getPersonCompletionRatio(petitioner);
   const beneficiaryCompletionRatio = getPersonCompletionRatio(beneficiary);
@@ -92,5 +100,6 @@ export function getCaseProgressState({
     hasChildren: childrenCount > 0,
     childrenReviewed,
     readyForQuestionnaire: petitionerComplete && beneficiaryComplete,
+    questionnaireCompletionRatio,
   };
 }

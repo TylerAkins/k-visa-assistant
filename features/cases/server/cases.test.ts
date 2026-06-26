@@ -176,7 +176,7 @@ describe("case server helpers", () => {
 
     const overview = await getCaseOverview("case-1");
 
-    expect(overview.case.progressPercent).toBe(100);
+    expect(overview.case.progressPercent).toBe(70);
     expect(overview.petitioner).toEqual(completePerson);
     expect(overview.children).toEqual([]);
   });
@@ -217,15 +217,15 @@ describe("case server helpers", () => {
     queueSelectResult([completePerson]);
     queueSelectResult([]);
     const update = queueUpdateReturning([
-      { id: "case-1", progressPercent: 100 },
+      { id: "case-1", progressPercent: 70 },
     ]);
 
     await expect(updateCaseProgress("case-1")).resolves.toEqual({
       id: "case-1",
-      progressPercent: 100,
+      progressPercent: 70,
     });
     expect(update.set).toHaveBeenCalledWith(expect.objectContaining({
-      progressPercent: 100,
+      progressPercent: 70,
       updatedAt: expect.any(Date),
     }));
   });

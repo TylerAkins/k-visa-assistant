@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -17,6 +18,7 @@ import type {
   QuestionnaireAnswer,
   QuestionnaireAnswerValue,
   QuestionnaireForCase,
+  QuestionnaireProgress,
   QuestionnaireQuestion,
   QuestionnaireSection,
   QuestionnaireSectionSaveResult,
@@ -33,11 +35,15 @@ export function QuestionnaireWorkflow({
   caseId,
   questionnaire,
   saveSectionAction,
+  onProgressChange,
 }: {
   caseId: string;
   questionnaire: QuestionnaireForCase;
   saveSectionAction: SaveQuestionnaireSectionAction;
+  onProgressChange?: (progressPercent: number) => void;
 }) {
+  const [progress, setProgress] = useState(questionnaire.progress);
+
   return (
     <section className="space-y-4" aria-labelledby="questionnaire-heading">
       <div className="space-y-1">
@@ -46,6 +52,9 @@ export function QuestionnaireWorkflow({
         </h2>
         <p className="text-sm text-muted-foreground">
           Complete the active I-129F sections for this case.
+        </p>
+        <p className="text-sm font-medium" aria-live="polite">
+          {progress.completedSections} of {progress.totalSections} sections complete
         </p>
       </div>
       <div className="grid gap-4">
@@ -56,6 +65,14 @@ export function QuestionnaireWorkflow({
             section={section}
             answers={questionnaire.answers}
             action={saveSectionAction}
+            complete={
+              progress.sections.find((item) => item.sectionKey === section.key)
+                ?.complete ?? false
+            }
+            onSave={(nextProgress, progressPercent) => {
+              setProgress(nextProgress);
+              onProgressChange?.(progressPercent);
+            }}
           />
         ))}
       </div>
@@ -68,15 +85,29 @@ function QuestionnaireSectionForm({
   section,
   answers,
   action,
+  complete,
+  onSave,
 }: {
   caseId: string;
   section: QuestionnaireSection;
   answers: QuestionnaireAnswer[];
   action: SaveQuestionnaireSectionAction;
+  complete: boolean;
+  onSave: (
+    questionnaireProgress: QuestionnaireProgress,
+    progressPercent: number,
+  ) => void;
 }) {
   const [state, formAction, pending] = useActionState(
-    async (_state: QuestionnaireSectionSaveResult, formData: FormData) =>
-      action(caseId, section.key, formData),
+    async (_state: QuestionnaireSectionSaveResult, formData: FormData) => {
+      const result = await action(caseId, section.key, formData);
+
+      if (result.success) {
+        onSave(result.questionnaireProgress, result.progressPercent);
+      }
+
+      return result;
+    },
     { success: false, fieldErrors: {} },
   );
   const [answersByQuestionKey, setAnswersByQuestionKey] = useState(
@@ -104,7 +135,12 @@ function QuestionnaireSectionForm({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle>{section.title}</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>{section.title}</CardTitle>
+          <Badge variant={complete ? "default" : "secondary"}>
+            {complete ? "Complete" : "Incomplete"}
+          </Badge>
+        </div>
         {section.description ? (
           <p className="text-sm text-muted-foreground">{section.description}</p>
         ) : null}
