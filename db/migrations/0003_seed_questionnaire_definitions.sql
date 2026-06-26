@@ -131,12 +131,25 @@ INSERT INTO "questionnaire_questions" (
   (
     'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
     (SELECT "id" FROM "questionnaire_sections" WHERE "key" = 'relationship'),
+    'meeting_waiver_explanation',
+    'Meeting waiver explanation',
+    'Explain why the in-person meeting requirement does not apply.',
+    'textarea',
+    true,
+    20,
+    true,
+    '{"visibleWhen":{"questionKey":"met_in_person","equals":false}}'::jsonb,
+    now()
+  ),
+  (
+    'cccccccc-cccc-4ccc-8ccc-ccccccccccc3',
+    (SELECT "id" FROM "questionnaire_sections" WHERE "key" = 'relationship'),
     'relationship_history',
     'Relationship history',
     'Describe how you met and how your relationship developed.',
     'textarea',
     false,
-    20,
+    30,
     true,
     NULL,
     now()

@@ -48,9 +48,33 @@ describe("questionnaire validation", () => {
     expect(
       parseQuestionnaireQuestionConfig("select", {
         options: [{ label: "Naturalization", value: "naturalization" }],
+        visibleWhen: {
+          questionKey: "met_in_person",
+          equals: true,
+        },
       }),
     ).toEqual({
       options: [{ label: "Naturalization", value: "naturalization" }],
+      visibleWhen: {
+        questionKey: "met_in_person",
+        equals: true,
+      },
+    });
+  });
+
+  it("accepts conditional config for non-select questions", () => {
+    expect(
+      parseQuestionnaireQuestionConfig("textarea", {
+        visibleWhen: {
+          questionKey: "met_in_person",
+          equals: false,
+        },
+      }),
+    ).toEqual({
+      visibleWhen: {
+        questionKey: "met_in_person",
+        equals: false,
+      },
     });
   });
 
@@ -60,6 +84,25 @@ describe("questionnaire validation", () => {
       parseQuestionnaireQuestionConfig("text", {
         options: [{ label: "Ignored", value: "ignored" }],
       }),
-    ).toThrow('Question type "text" does not support configuration yet.');
+    ).toThrow();
+  });
+
+  it("rejects invalid visibility conditions", () => {
+    expect(() =>
+      parseQuestionnaireQuestionConfig("textarea", {
+        visibleWhen: {
+          questionKey: "Met in person?",
+          equals: false,
+        },
+      }),
+    ).toThrow();
+
+    expect(() =>
+      parseQuestionnaireQuestionConfig("textarea", {
+        visibleWhen: {
+          questionKey: "met_in_person",
+        },
+      }),
+    ).toThrow();
   });
 });

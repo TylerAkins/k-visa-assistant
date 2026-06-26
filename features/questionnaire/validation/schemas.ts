@@ -21,9 +21,30 @@ const questionnaireSelectOptionSchema = z.object({
   value: z.string().trim().min(1).max(160),
 });
 
-const questionnaireSelectConfigSchema = z.object({
-  options: z.array(questionnaireSelectOptionSchema).min(1),
-});
+const questionnaireVisibilityConditionSchema = z
+  .object({
+    questionKey: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .regex(/^[a-z][a-z0-9_]*$/),
+    equals: z.union([z.string(), z.number().finite(), z.boolean(), z.null()]),
+  })
+  .strict();
+
+const questionnaireSelectConfigSchema = z
+  .object({
+    options: z.array(questionnaireSelectOptionSchema).min(1),
+    visibleWhen: questionnaireVisibilityConditionSchema.optional(),
+  })
+  .strict();
+
+const questionnaireConditionalConfigSchema = z
+  .object({
+    visibleWhen: questionnaireVisibilityConditionSchema,
+  })
+  .strict();
 
 function isJsonSerializable(
   value: unknown,
@@ -89,9 +110,7 @@ export function parseQuestionnaireQuestionConfig(
   }
 
   if (config !== null && config !== undefined) {
-    throw new Error(
-      `Question type "${parsedType}" does not support configuration yet.`,
-    );
+    return questionnaireConditionalConfigSchema.parse(config);
   }
 
   return null;
