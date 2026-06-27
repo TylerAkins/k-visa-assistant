@@ -206,6 +206,56 @@ const petitionerCitizenshipBasisQuestion = {
   },
 };
 
+const beneficiaryCurrentlyInUsQuestion = {
+  ...activeQuestion,
+  id: "question-beneficiary-currently-in-us",
+  sectionId: "section-beneficiary",
+  key: "beneficiary_currently_in_us",
+  label: "Is the beneficiary currently in the United States?",
+  required: true,
+  sortOrder: 10,
+};
+
+const beneficiaryPassportNumberQuestion = {
+  ...activeQuestion,
+  id: "question-beneficiary-passport-number",
+  sectionId: "section-beneficiary",
+  key: "beneficiary_passport_number",
+  label: "Passport number",
+  questionType: "text",
+  required: true,
+  sortOrder: 20,
+  config: {
+    visibleWhen: {
+      questionKey: "beneficiary_currently_in_us",
+      equals: true,
+    },
+  },
+};
+
+const beneficiaryPassportExpirationQuestion = {
+  ...activeQuestion,
+  id: "question-beneficiary-passport-expiration",
+  sectionId: "section-beneficiary",
+  key: "beneficiary_passport_expiration",
+  label: "Passport expiration date",
+  questionType: "date",
+  required: true,
+  sortOrder: 30,
+  config: {
+    visibleWhen: {
+      questionKey: "beneficiary_currently_in_us",
+      equals: true,
+    },
+  },
+};
+
+const beneficiaryQuestions = [
+  beneficiaryCurrentlyInUsQuestion,
+  beneficiaryPassportNumberQuestion,
+  beneficiaryPassportExpirationQuestion,
+];
+
 describe("questionnaire data access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -324,6 +374,109 @@ describe("questionnaire data access", () => {
       totalSections: 4,
       percent: 25,
     });
+  });
+
+  it("creates and reloads beneficiary answers for an owned case", async () => {
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const transaction = createTransactionQuery();
+    const formData = new FormData();
+    formData.set("beneficiary_currently_in_us", "true");
+    formData.set("beneficiary_passport_number", "  X1234567  ");
+    formData.set("beneficiary_passport_expiration", "2030-06-15");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(beneficiaryQuestions))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(beneficiaryQuestions))
+      .mockReturnValueOnce(
+        createSelectQuery([
+          {
+            id: "answer-beneficiary-currently-in-us",
+            caseId: "case-1",
+            questionId: "question-beneficiary-currently-in-us",
+            value: true,
+            createdAt: savedAt,
+            updatedAt: savedAt,
+          },
+          {
+            id: "answer-beneficiary-passport-number",
+            caseId: "case-1",
+            questionId: "question-beneficiary-passport-number",
+            value: "X1234567",
+            createdAt: savedAt,
+            updatedAt: savedAt,
+          },
+          {
+            id: "answer-beneficiary-passport-expiration",
+            caseId: "case-1",
+            questionId: "question-beneficiary-passport-expiration",
+            value: "2030-06-15",
+            createdAt: savedAt,
+            updatedAt: savedAt,
+          },
+        ]),
+      )
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "beneficiary", formData),
+    ).resolves.toMatchObject({
+      success: true,
+      progressPercent: 78,
+      questionnaireProgress: {
+        completedSections: 1,
+        totalSections: 4,
+        percent: 25,
+      },
+    });
+
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-beneficiary-currently-in-us",
+        value: true,
+      }),
+    );
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-beneficiary-passport-number",
+        value: "X1234567",
+      }),
+    );
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-beneficiary-passport-expiration",
+        value: "2030-06-15",
+      }),
+    );
+
+    const questionnaire = await getQuestionnaireForCase("case-1");
+
+    expect(questionnaire.sections[1]).toMatchObject({
+      key: "beneficiary",
+      sortOrder: 20,
+      questions: [
+        { key: "beneficiary_currently_in_us", sortOrder: 10 },
+        { key: "beneficiary_passport_number", sortOrder: 20 },
+        { key: "beneficiary_passport_expiration", sortOrder: 30 },
+      ],
+    });
+    expect(questionnaire.answers).toEqual([
+      expect.objectContaining({
+        questionKey: "beneficiary_currently_in_us",
+        value: true,
+      }),
+      expect.objectContaining({
+        questionKey: "beneficiary_passport_number",
+        value: "X1234567",
+      }),
+      expect.objectContaining({
+        questionKey: "beneficiary_passport_expiration",
+        value: "2030-06-15",
+      }),
+    ]);
   });
 
   it("uses locked authoritative answers to set full questionnaire progress", async () => {
@@ -532,6 +685,149 @@ describe("questionnaire data access", () => {
     });
 
     expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing required beneficiary presence answer before writing", async () => {
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(beneficiaryQuestions))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers(
+        "case-1",
+        "beneficiary",
+        new FormData(),
+      ),
+    ).resolves.toEqual({
+      success: false,
+      fieldErrors: {
+        beneficiary_currently_in_us: [
+          'Please answer "Is the beneficiary currently in the United States?" before saving.',
+        ],
+      },
+    });
+
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  it("requires passport answers when the beneficiary is in the US", async () => {
+    const formData = new FormData();
+    formData.set("beneficiary_currently_in_us", "true");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(beneficiaryQuestions))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "beneficiary", formData),
+    ).resolves.toEqual({
+      success: false,
+      fieldErrors: {
+        beneficiary_passport_number: [
+          'Please answer "Passport number" before saving.',
+        ],
+        beneficiary_passport_expiration: [
+          'Please answer "Passport expiration date" before saving.',
+        ],
+      },
+    });
+
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid beneficiary passport expiration before writing", async () => {
+    const formData = new FormData();
+    formData.set("beneficiary_currently_in_us", "true");
+    formData.set("beneficiary_passport_number", "X1234567");
+    formData.set("beneficiary_passport_expiration", "2030-02-30");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(beneficiaryQuestions))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "beneficiary", formData),
+    ).resolves.toEqual({
+      success: false,
+      fieldErrors: {
+        beneficiary_passport_expiration: [
+          'Enter a valid date for "Passport expiration date".',
+        ],
+      },
+    });
+
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  it("clears passport answers when the beneficiary is not in the US", async () => {
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const savedPassportAnswers = [
+      {
+        id: "answer-beneficiary-passport-number",
+        caseId: "case-1",
+        questionId: "question-beneficiary-passport-number",
+        value: "X1234567",
+        createdAt: savedAt,
+        updatedAt: savedAt,
+      },
+      {
+        id: "answer-beneficiary-passport-expiration",
+        caseId: "case-1",
+        questionId: "question-beneficiary-passport-expiration",
+        value: "2030-06-15",
+        createdAt: savedAt,
+        updatedAt: savedAt,
+      },
+    ];
+    const transaction = createTransactionQuery({
+      currentAnswers: savedPassportAnswers,
+    });
+    const formData = new FormData();
+    formData.set("beneficiary_currently_in_us", "false");
+    formData.set("beneficiary_passport_number", "ignored");
+    formData.set("beneficiary_passport_expiration", "not-a-date");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(beneficiaryQuestions))
+      .mockReturnValueOnce(createSelectQuery(savedPassportAnswers))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "beneficiary", formData),
+    ).resolves.toMatchObject({
+      success: true,
+      progressPercent: 78,
+      questionnaireProgress: {
+        completedSections: 1,
+        totalSections: 4,
+        percent: 25,
+      },
+    });
+
+    expect(transaction.deleteWhere).toHaveBeenCalledTimes(2);
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-beneficiary-currently-in-us",
+        value: false,
+      }),
+    );
+    expect(transaction.values).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-beneficiary-passport-number",
+      }),
+    );
+    expect(transaction.values).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-beneficiary-passport-expiration",
+      }),
+    );
   });
 
   it("does not partially save earlier answers when a later answer is invalid", async () => {

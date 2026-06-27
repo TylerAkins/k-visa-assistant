@@ -33,6 +33,18 @@ The acceptance-scoped petitioner section uses these stable question definitions:
 
 `petitioner_citizenship_basis` accepts `birth_us`, `naturalization`, or `certificate`. Phase 2 remains the source of truth for the petitioner's identity and contact details. Repeatable Form I-129F petitioner histories, including addresses, employment, parents, marriages, and prior filings, are not part of this initial section.
 
+## Beneficiary Section
+
+The acceptance-scoped beneficiary section uses these stable question definitions:
+
+| Question key | Type | Required | Display order |
+|--------------|------|----------|---------------|
+| `beneficiary_currently_in_us` | `boolean` | Yes | 10 |
+| `beneficiary_passport_number` | `text` | When visible | 20 |
+| `beneficiary_passport_expiration` | `date` | When visible | 30 |
+
+The passport questions are visible and required only when `beneficiary_currently_in_us` is `true`. Selecting no clears saved passport answers through the questionnaire engine's existing hidden-answer behavior. Phase 2 remains the source of truth for the beneficiary's identity, contact details, and address.
+
 ## Case Attachment
 
 - Questionnaire answers attach to the existing case root through `caseId`.
