@@ -98,6 +98,96 @@ const successfulSave = {
   questionnaireProgress: questionnaire.progress,
 };
 
+const relationshipQuestionnaire = {
+  ...questionnaire,
+  sections: [
+    {
+      ...questionnaire.sections[0],
+      questions: [
+        {
+          id: "question-familial",
+          key: "familial_relationship",
+          label: "Are you and your fiance related to each other?",
+          helpText: "Include relationships by blood, marriage, or adoption.",
+          questionType: "boolean",
+          required: true,
+          sortOrder: 10,
+          config: null,
+        },
+        {
+          id: "question-familial-details",
+          key: "familial_relationship_details",
+          label: "Nature and degree of relationship",
+          helpText: "Describe how you and your fiance are related.",
+          questionType: "textarea",
+          required: true,
+          sortOrder: 20,
+          config: {
+            visibleWhen: { questionKey: "familial_relationship", equals: true },
+          },
+        },
+        {
+          ...questionnaire.sections[0].questions[0],
+          sortOrder: 30,
+        },
+        {
+          id: "question-meeting-date",
+          key: "most_recent_meeting_date",
+          label: "Most recent in-person meeting date",
+          helpText: null,
+          questionType: "date",
+          required: true,
+          sortOrder: 40,
+          config: { visibleWhen: { questionKey: "met_in_person", equals: true } },
+        },
+        {
+          id: "question-meeting-details",
+          key: "in_person_meeting_details",
+          label: "In-person meeting details",
+          helpText: "Describe the circumstances and location of your most recent meeting.",
+          questionType: "textarea",
+          required: true,
+          sortOrder: 50,
+          config: { visibleWhen: { questionKey: "met_in_person", equals: true } },
+        },
+        {
+          ...questionnaire.sections[0].questions[2],
+          sortOrder: 60,
+        },
+        {
+          ...questionnaire.sections[0].questions[1],
+          required: true,
+          sortOrder: 70,
+        },
+      ],
+    },
+  ],
+  answers: [
+    {
+      caseId: "case-1",
+      questionId: "question-familial",
+      questionKey: "familial_relationship",
+      value: false,
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+    ...questionnaire.answers,
+    {
+      caseId: "case-1",
+      questionId: "question-meeting-date",
+      questionKey: "most_recent_meeting_date",
+      value: "2026-01-15",
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+    {
+      caseId: "case-1",
+      questionId: "question-meeting-details",
+      questionKey: "in_person_meeting_details",
+      value: "We met in Chicago.",
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+  ],
+} satisfies QuestionnaireForCase;
+
 const petitionerQuestionnaire = {
   ...questionnaire,
   sections: [
@@ -256,6 +346,68 @@ const beneficiaryQuestionnaire = {
 } satisfies QuestionnaireForCase;
 
 describe("QuestionnaireWorkflow", () => {
+  it("renders saved relationship answers in configured question order", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: relationshipQuestionnaire,
+        saveSectionAction: async () => successfulSave,
+      }),
+    );
+    const fieldNames = [
+      "familial_relationship",
+      "met_in_person",
+      "most_recent_meeting_date",
+      "in_person_meeting_details",
+      "relationship_history",
+    ];
+
+    for (const [index, fieldName] of fieldNames.entries()) {
+      expect(html).toContain(`name="${fieldName}"`);
+      if (index > 0) {
+        expect(html.indexOf(`name="${fieldNames[index - 1]}"`)).toBeLessThan(
+          html.indexOf(`name="${fieldName}"`),
+        );
+      }
+    }
+    expect(html).not.toContain('name="familial_relationship_details"');
+    expect(html).not.toContain('name="meeting_waiver_explanation"');
+    expect(html).toContain('value="2026-01-15"');
+    expect(html).toContain("We met in Chicago.");
+  });
+
+  it("renders only the matching familial and meeting branches", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: {
+          ...relationshipQuestionnaire,
+          answers: [
+            {
+              caseId: "case-1",
+              questionId: "question-familial",
+              questionKey: "familial_relationship",
+              value: true,
+              updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            },
+            {
+              caseId: "case-1",
+              questionId: "question-met",
+              questionKey: "met_in_person",
+              value: false,
+              updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            },
+          ],
+        },
+        saveSectionAction: async () => successfulSave,
+      }),
+    );
+
+    expect(html).toContain('name="familial_relationship_details"');
+    expect(html).toContain('name="meeting_waiver_explanation"');
+    expect(html).not.toContain('name="most_recent_meeting_date"');
+    expect(html).not.toContain('name="in_person_meeting_details"');
+  });
   it("renders saved petitioner answers first in configured question order", () => {
     const html = renderToStaticMarkup(
       React.createElement(QuestionnaireWorkflow, {

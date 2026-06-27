@@ -43,6 +43,13 @@
       "when": 1782246775300,
       "tag": "0005_seed_beneficiary_questionnaire_definitions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782579600000,
+      "tag": "0006_seed_relationship_questionnaire_definitions",
+      "breakpoints": true
     }
   ]
 }

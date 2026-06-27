@@ -45,6 +45,22 @@ The acceptance-scoped beneficiary section uses these stable question definitions
 
 The passport questions are visible and required only when `beneficiary_currently_in_us` is `true`. Selecting no clears saved passport answers through the questionnaire engine's existing hidden-answer behavior. Phase 2 remains the source of truth for the beneficiary's identity, contact details, and address.
 
+## Relationship Section
+
+The acceptance-scoped relationship section uses these stable question definitions:
+
+| Question key | Type | Required | Display order |
+|--------------|------|----------|---------------|
+| `familial_relationship` | `boolean` | Yes | 10 |
+| `familial_relationship_details` | `textarea` | When visible | 20 |
+| `met_in_person` | `boolean` | Yes | 30 |
+| `most_recent_meeting_date` | `date` | When visible | 40 |
+| `in_person_meeting_details` | `textarea` | When visible | 50 |
+| `meeting_waiver_explanation` | `textarea` | When visible | 60 |
+| `relationship_history` | `textarea` | Yes | 70 |
+
+`familial_relationship_details` is visible and required when the couple is related. The meeting date and details are visible and required when `met_in_person` is `true`; otherwise the waiver explanation is visible and required. Changing either controlling answer clears saved answers that belong to the now-hidden branch.
+
 ## Case Attachment
 
 - Questionnaire answers attach to the existing case root through `caseId`.
