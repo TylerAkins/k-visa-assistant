@@ -71,6 +71,6 @@ Day-to-day development runs on **local** only. Use `pnpm setup` (default) with D
 - **Phase 0 complete:** app scaffold, soft dark theme, validated environment config, Drizzle database connection, and health checks.
 - **Phase 1 complete:** Argon2id passwords, database-backed sessions, email verification, password reset, optional TOTP with recovery codes, and account settings.
 - **Phase 2 complete:** authenticated case dashboard, case creation, petitioner and beneficiary details, K-2 children tracking, ownership checks, and progress calculation. See [docs/cases.md](docs/cases.md).
-- **Phase 3 in progress:** questionnaire data model is complete via [issue #5](https://github.com/TylerAkins/k-visa-assistant/issues/5), and section architecture is defined via [issue #6](https://github.com/TylerAkins/k-visa-assistant/issues/6). Phase 3 now has stable petitioner, beneficiary, relationship, and children section identifiers for rendering, validation, progress, and review state. Remaining Phase 3 workflow/UI work is still ahead.
+- **Phase 3 complete:** questionnaire data model, section architecture, stable petitioner/beneficiary/relationship/children section identifiers, rendering, validation, progress, and review state. See [docs/questionnaire.md](docs/questionnaire.md) and the related Phase 3 issues [#5](https://github.com/TylerAkins/k-visa-assistant/issues/5) and [#6](https://github.com/TylerAkins/k-visa-assistant/issues/6).
 
 PDF generation and evidence organization are still ahead.
