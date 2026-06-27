@@ -1,4 +1,5 @@
 import type { QuestionnaireSectionId } from "@/features/questionnaire/sections";
+import type { ChildSummary } from "@/features/cases/types";
 
 export const questionnaireQuestionTypes = [
   "text",
@@ -97,6 +98,8 @@ export type QuestionnaireForCase = {
   answers: QuestionnaireAnswer[];
   state: QuestionnaireCaseState | null;
   progress: QuestionnaireProgress;
+  children: ChildSummary[];
+  childrenReviewed: boolean;
 };
 
 export type QuestionnaireReviewAnswerStatus =

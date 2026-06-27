@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 
@@ -40,11 +40,13 @@ export function QuestionnaireWorkflow({
   questionnaire,
   saveSectionAction,
   onProgressChange,
+  childrenSection,
 }: {
   caseId: string;
   questionnaire: QuestionnaireForCase;
   saveSectionAction: SaveQuestionnaireSectionAction;
   onProgressChange?: (progressPercent: number) => void;
+  childrenSection: ReactNode;
 }) {
   const [progress, setProgress] = useState(questionnaire.progress);
 
@@ -62,8 +64,13 @@ export function QuestionnaireWorkflow({
         </p>
       </div>
       <div className="grid gap-4">
-        {questionnaire.sections.map((section) => (
-          <QuestionnaireSectionForm
+        {questionnaire.sections.map((section) =>
+          section.key === "children" ? (
+            <div key={section.key} id="questionnaire-section-children">
+              {childrenSection}
+            </div>
+          ) : (
+            <QuestionnaireSectionForm
             key={section.key}
             caseId={caseId}
             section={section}
@@ -77,8 +84,9 @@ export function QuestionnaireWorkflow({
               setProgress(nextProgress);
               onProgressChange?.(progressPercent);
             }}
-          />
-        ))}
+            />
+          ),
+        )}
       </div>
       <Link
         href={`/cases/${caseId}/review`}

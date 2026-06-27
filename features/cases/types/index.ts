@@ -35,8 +35,17 @@ export type ChildSummary = {
   middleName: string | null;
   lastName: string;
   dateOfBirth: Date | null;
+  countryOfBirth: string | null;
   citizenship: string | null;
   relationshipType: string;
+  residesWithBeneficiary: boolean | null;
+  street1: string | null;
+  street2: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  country: string | null;
+  sortOrder: number;
 };
 
 export type CaseOverviewData = {
@@ -45,6 +54,12 @@ export type CaseOverviewData = {
   beneficiary: PersonSummary | null;
   children: ChildSummary[];
 };
+
+export type ChildFieldErrors = Record<string, string[]>;
+
+export type SaveChildrenResult =
+  | { success: true; progressPercent: number }
+  | { success: false; error?: string; fieldErrors: ChildFieldErrors };
 
 export type ProgressState = {
   hasPetitioner: boolean;

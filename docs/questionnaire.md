@@ -61,6 +61,12 @@ The acceptance-scoped relationship section uses these stable question definition
 
 `familial_relationship_details` is visible and required when the couple is related. The meeting date and details are visible and required when `met_in_person` is `true`; otherwise the waiver explanation is visible and required. Changing either controlling answer clears saved answers that belong to the now-hidden branch.
 
+## Children Section
+
+The Children section renders from the case's canonical `k2_children` relationship instead of `questionnaire_answers`. Users must explicitly review the no-children path or provide one to ten complete child records. Each child requires a name, date and country of birth, relationship type, and whether the child lives with the beneficiary. A different residence requires the child's street, city, postal code, and country.
+
+Child saves preserve existing record identifiers, reconcile additions and removals in one transaction, and clear address fields when the child lives with the beneficiary. The section is complete only after review and while every persisted child record remains valid. Child records also appear in questionnaire review output.
+
 ## Case Attachment
 
 - Questionnaire answers attach to the existing case root through `caseId`.

@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { mockAssertCaseOwnership, mockDb, mockGetPhase2CaseProgress } = vi.hoisted(() => ({
+const { mockAssertCaseOwnership, mockDb, mockGetCaseChildrenState, mockGetPhase2CaseProgress } = vi.hoisted(() => ({
   mockAssertCaseOwnership: vi.fn(),
+  mockGetCaseChildrenState: vi.fn(),
   mockGetPhase2CaseProgress: vi.fn(),
   mockDb: {
     select: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/features/cases/server/cases", () => ({
   assertCaseOwnership: mockAssertCaseOwnership,
+  getCaseChildrenState: mockGetCaseChildrenState,
   getPhase2CaseProgress: mockGetPhase2CaseProgress,
 }));
 
@@ -328,6 +330,7 @@ describe("questionnaire data access", () => {
       progressPercent: 70,
       userId: "user-1",
     });
+    mockGetCaseChildrenState.mockResolvedValue({ children: [], reviewed: false });
   });
 
   it("creates and reloads petitioner answers for an owned case", async () => {
@@ -686,6 +689,7 @@ describe("questionnaire data access", () => {
   });
 
   it("uses locked authoritative answers to set full questionnaire progress", async () => {
+    mockGetCaseChildrenState.mockResolvedValue({ children: [], reviewed: true });
     const formData = new FormData();
     formData.set("met_in_person", "true");
     const optionalQuestions = [

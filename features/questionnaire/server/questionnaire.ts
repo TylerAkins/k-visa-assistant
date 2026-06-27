@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import {
   assertCaseOwnership,
+  getCaseChildrenState,
   getPhase2CaseProgress,
 } from "@/features/cases/server/cases";
 import { calculateQuestionnaireProgressContribution } from "@/features/cases/server/progress";
@@ -159,7 +160,10 @@ export async function getQuestionnaireForCase(
 ): Promise<QuestionnaireForCase> {
   await assertCaseOwnership(caseId);
 
-  const sections = await listQuestionnaireDefinition();
+  const [sections, childState] = await Promise.all([
+    listQuestionnaireDefinition(),
+    getCaseChildrenState(caseId),
+  ]);
 
   const [answers, stateRows] = await Promise.all([
     db
@@ -179,7 +183,12 @@ export async function getQuestionnaireForCase(
     sections,
     answers: mappedAnswers,
     state: stateRows[0] ? mapCaseState(stateRows[0]) : null,
-    progress: calculateQuestionnaireProgress(sections, mappedAnswers),
+    progress: calculateQuestionnaireProgress(sections, mappedAnswers, {
+      children: childState.children,
+      reviewed: childState.reviewed,
+    }),
+    children: childState.children,
+    childrenReviewed: childState.reviewed,
   };
 }
 
@@ -304,6 +313,10 @@ export async function saveQuestionnaireSectionAnswers(
     const questionnaireProgress = calculateQuestionnaireProgress(
       questionnaire.sections,
       nextAnswers,
+      {
+        children: questionnaire.children,
+        reviewed: questionnaire.childrenReviewed,
+      },
     );
     const currentState = currentStateRow ? mapCaseState(currentStateRow) : null;
     const completedAt =

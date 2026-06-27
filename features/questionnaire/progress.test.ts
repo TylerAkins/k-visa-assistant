@@ -6,6 +6,7 @@ import type {
   QuestionnaireQuestion,
   QuestionnaireSection,
 } from "@/features/questionnaire/types";
+import type { ChildSummary } from "@/features/cases/types";
 
 function question(
   key: string,
@@ -51,6 +52,28 @@ function answer(
   };
 }
 
+function child(overrides: Partial<ChildSummary> = {}): ChildSummary {
+  return {
+    id: "11111111-1111-4111-8111-111111111111",
+    firstName: "Kai",
+    middleName: null,
+    lastName: "Nguyen",
+    dateOfBirth: new Date("2018-01-01T00:00:00.000Z"),
+    countryOfBirth: "Vietnam",
+    citizenship: "Vietnam",
+    relationshipType: "Child",
+    residesWithBeneficiary: true,
+    street1: null,
+    street2: null,
+    city: null,
+    province: null,
+    postalCode: null,
+    country: null,
+    sortOrder: 0,
+    ...overrides,
+  };
+}
+
 describe("questionnaire progress", () => {
   it("keeps empty and unsaved sections incomplete", () => {
     expect(
@@ -80,6 +103,34 @@ describe("questionnaire progress", () => {
 
     expect(progress.completedSections).toBe(1);
     expect(progress.percent).toBe(100);
+  });
+
+  it("derives children completion for zero, one, and multiple records", () => {
+    const sections = [section("children", [])];
+
+    expect(
+      calculateQuestionnaireProgress(sections, [], { children: [], reviewed: false })
+        .completedSections,
+    ).toBe(0);
+    expect(
+      calculateQuestionnaireProgress(sections, [], { children: [], reviewed: true })
+        .completedSections,
+    ).toBe(1);
+    expect(
+      calculateQuestionnaireProgress(sections, [], {
+        children: [
+          child(),
+          child({ id: "22222222-2222-4222-8222-222222222222", sortOrder: 1 }),
+        ],
+        reviewed: true,
+      }).completedSections,
+    ).toBe(1);
+    expect(
+      calculateQuestionnaireProgress(sections, [], {
+        children: [child({ countryOfBirth: null })],
+        reviewed: true,
+      }).completedSections,
+    ).toBe(0);
   });
 
   it("requires valid values for required and optional visible answers", () => {
