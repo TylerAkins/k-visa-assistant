@@ -22,6 +22,17 @@ Phase 3 sections are identified by stable keys:
 
 Rendering, validation, progress, and review code should consume these identifiers from the registry instead of duplicating string literals or sort order values.
 
+## Petitioner Section
+
+The acceptance-scoped petitioner section uses these stable question definitions:
+
+| Question key | Type | Required | Display order |
+|--------------|------|----------|---------------|
+| `petitioner_other_names` | `textarea` | No | 10 |
+| `petitioner_citizenship_basis` | `select` | Yes | 20 |
+
+`petitioner_citizenship_basis` accepts `birth_us`, `naturalization`, or `certificate`. Phase 2 remains the source of truth for the petitioner's identity and contact details. Repeatable Form I-129F petitioner histories, including addresses, employment, parents, marriages, and prior filings, are not part of this initial section.
+
 ## Case Attachment
 
 - Questionnaire answers attach to the existing case root through `caseId`.
