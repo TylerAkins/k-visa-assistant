@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isQuestionVisible } from "@/features/questionnaire/conditions";
+import {
+  isQuestionVisible,
+  pruneResolvedHiddenAnswers,
+} from "@/features/questionnaire/conditions";
 import type { QuestionnaireQuestion } from "@/features/questionnaire/types";
 
 const question = {
@@ -15,6 +18,19 @@ const question = {
     visibleWhen: {
       questionKey: "met_in_person",
       equals: false,
+    },
+  },
+} satisfies QuestionnaireQuestion;
+
+const passportQuestion = {
+  ...question,
+  id: "question-passport",
+  key: "beneficiary_passport_number",
+  label: "Passport number",
+  config: {
+    visibleWhen: {
+      questionKey: "beneficiary_currently_in_us",
+      equals: true,
     },
   },
 } satisfies QuestionnaireQuestion;
@@ -57,5 +73,30 @@ describe("questionnaire conditions", () => {
         new Map(),
       ),
     ).toBe(true);
+  });
+
+  it("preserves saved conditional answers while a new dependency is unanswered", () => {
+    const answers = new Map([
+      ["beneficiary_passport_number", "X1234567"],
+    ]);
+
+    expect(
+      pruneResolvedHiddenAnswers([passportQuestion], answers).get(
+        "beneficiary_passport_number",
+      ),
+    ).toBe("X1234567");
+  });
+
+  it("prunes saved conditional answers after a dependency explicitly hides them", () => {
+    const answers = new Map<string, string | boolean>([
+      ["beneficiary_currently_in_us", false],
+      ["beneficiary_passport_number", "X1234567"],
+    ]);
+
+    expect(
+      pruneResolvedHiddenAnswers([passportQuestion], answers).has(
+        "beneficiary_passport_number",
+      ),
+    ).toBe(false);
   });
 });

@@ -165,6 +165,96 @@ const petitionerQuestionnaire = {
   },
 } satisfies QuestionnaireForCase;
 
+const beneficiaryQuestionnaire = {
+  ...questionnaire,
+  sections: [
+    ...petitionerQuestionnaire.sections.slice(0, 1),
+    {
+      id: "section-beneficiary",
+      key: "beneficiary",
+      title: "Beneficiary",
+      description: "Foreign fiance beneficiary information for the case.",
+      sortOrder: 20,
+      questions: [
+        {
+          id: "question-beneficiary-currently-in-us",
+          key: "beneficiary_currently_in_us",
+          label: "Is the beneficiary currently in the United States?",
+          helpText: null,
+          questionType: "boolean",
+          required: true,
+          sortOrder: 10,
+          config: null,
+        },
+        {
+          id: "question-beneficiary-passport-number",
+          key: "beneficiary_passport_number",
+          label: "Passport number",
+          helpText: null,
+          questionType: "text",
+          required: true,
+          sortOrder: 20,
+          config: {
+            visibleWhen: {
+              questionKey: "beneficiary_currently_in_us",
+              equals: true,
+            },
+          },
+        },
+        {
+          id: "question-beneficiary-passport-expiration",
+          key: "beneficiary_passport_expiration",
+          label: "Passport expiration date",
+          helpText: null,
+          questionType: "date",
+          required: true,
+          sortOrder: 30,
+          config: {
+            visibleWhen: {
+              questionKey: "beneficiary_currently_in_us",
+              equals: true,
+            },
+          },
+        },
+      ],
+    },
+    ...questionnaire.sections,
+  ],
+  answers: [
+    {
+      caseId: "case-1",
+      questionId: "question-beneficiary-currently-in-us",
+      questionKey: "beneficiary_currently_in_us",
+      value: true,
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+    {
+      caseId: "case-1",
+      questionId: "question-beneficiary-passport-number",
+      questionKey: "beneficiary_passport_number",
+      value: "X1234567",
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+    {
+      caseId: "case-1",
+      questionId: "question-beneficiary-passport-expiration",
+      questionKey: "beneficiary_passport_expiration",
+      value: "2030-06-15",
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+  ],
+  progress: {
+    completedSections: 1,
+    totalSections: 3,
+    percent: 33,
+    sections: [
+      { sectionKey: "petitioner", complete: false },
+      { sectionKey: "beneficiary", complete: true },
+      { sectionKey: "relationship", complete: false },
+    ],
+  },
+} satisfies QuestionnaireForCase;
+
 describe("QuestionnaireWorkflow", () => {
   it("renders saved petitioner answers first in configured question order", () => {
     const html = renderToStaticMarkup(
@@ -188,6 +278,60 @@ describe("QuestionnaireWorkflow", () => {
     expect(html).toContain(
       '<option value="naturalization" selected="">Naturalization</option>',
     );
+  });
+
+  it("renders saved beneficiary answers between petitioner and relationship", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: beneficiaryQuestionnaire,
+        saveSectionAction: async () => ({
+          ...successfulSave,
+          questionnaireProgress: beneficiaryQuestionnaire.progress,
+        }),
+      }),
+    );
+
+    expect(html.indexOf("questionnaire-section-petitioner")).toBeLessThan(
+      html.indexOf("questionnaire-section-beneficiary"),
+    );
+    expect(html.indexOf("questionnaire-section-beneficiary")).toBeLessThan(
+      html.indexOf("questionnaire-section-relationship"),
+    );
+    expect(html.indexOf('name="beneficiary_currently_in_us"')).toBeLessThan(
+      html.indexOf('name="beneficiary_passport_number"'),
+    );
+    expect(html.indexOf('name="beneficiary_passport_number"')).toBeLessThan(
+      html.indexOf('name="beneficiary_passport_expiration"'),
+    );
+    expect(html).toContain('<option value="true" selected="">Yes</option>');
+    expect(html).toContain('value="X1234567"');
+    expect(html).toContain('value="2030-06-15"');
+  });
+
+  it("hides beneficiary passport questions when the beneficiary is not in the US", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: {
+          ...beneficiaryQuestionnaire,
+          answers: [
+            {
+              caseId: "case-1",
+              questionId: "question-beneficiary-currently-in-us",
+              questionKey: "beneficiary_currently_in_us",
+              value: false,
+              updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+            },
+          ],
+        },
+        saveSectionAction: async () => successfulSave,
+      }),
+    );
+
+    expect(html).toContain('name="beneficiary_currently_in_us"');
+    expect(html).not.toContain('name="beneficiary_passport_number"');
+    expect(html).not.toContain('name="beneficiary_passport_expiration"');
   });
 
   it("renders definition-driven question fields with stable names", () => {

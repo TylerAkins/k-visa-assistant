@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isQuestionVisible } from "@/features/questionnaire/conditions";
+import {
+  isQuestionVisible,
+  pruneResolvedHiddenAnswers,
+} from "@/features/questionnaire/conditions";
 import type {
   QuestionnaireAnswer,
   QuestionnaireAnswerValue,
@@ -119,8 +122,8 @@ function QuestionnaireSectionForm({
   );
   const [answersByQuestionKey, setAnswersByQuestionKey] = useState(
     () =>
-      pruneHiddenAnswers(
-        section,
+      pruneResolvedHiddenAnswers(
+        section.questions,
         new Map(
           answers.map((answer) => [answer.questionKey, answer.value] as const),
         ),
@@ -135,7 +138,7 @@ function QuestionnaireSectionForm({
     setAnswersByQuestionKey((currentAnswers) => {
       const nextAnswers = new Map(currentAnswers);
       nextAnswers.set(questionKey, value);
-      return pruneHiddenAnswers(section, nextAnswers);
+      return pruneResolvedHiddenAnswers(section.questions, nextAnswers);
     });
   }
 
@@ -407,19 +410,4 @@ function getVisibleQuestions(
   }
 
   return visibleQuestions;
-}
-
-function pruneHiddenAnswers(
-  section: QuestionnaireSection,
-  answersByQuestionKey: ReadonlyMap<string, QuestionnaireAnswerValue>,
-) {
-  const visibleAnswersByQuestionKey = new Map(answersByQuestionKey);
-
-  for (const question of section.questions) {
-    if (!isQuestionVisible(question, visibleAnswersByQuestionKey)) {
-      visibleAnswersByQuestionKey.delete(question.key);
-    }
-  }
-
-  return visibleAnswersByQuestionKey;
 }
