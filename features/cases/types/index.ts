@@ -56,4 +56,5 @@ export type ProgressState = {
   hasChildren: boolean;
   childrenReviewed: boolean;
   readyForQuestionnaire: boolean;
+  questionnaireCompletionRatio: number;
 };

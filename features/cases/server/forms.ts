@@ -10,7 +10,14 @@ import {
   childSchema,
   petitionerSchema,
 } from "@/features/cases/validation/schemas";
+import { getQuestionnaireForCase } from "@/features/questionnaire/server/questionnaire";
 import { updateCaseProgress } from "./cases";
+
+async function updateAggregateCaseProgress(caseId: string) {
+  const questionnaire = await getQuestionnaireForCase(caseId);
+
+  return updateCaseProgress(caseId, questionnaire.progress.percent / 100);
+}
 
 export async function updateCaseTitle(caseId: string, input: FormData) {
   const parsed = caseTitleSchema.safeParse({
@@ -26,7 +33,7 @@ export async function updateCaseTitle(caseId: string, input: FormData) {
     .set({ title: parsed.data.title, updatedAt: new Date() })
     .where(eq(cases.id, caseId));
 
-  const caseRecord = await updateCaseProgress(caseId);
+  const caseRecord = await updateAggregateCaseProgress(caseId);
   return { success: true, progressPercent: caseRecord.progressPercent };
 }
 
@@ -61,7 +68,7 @@ async function upsertSinglePerson(
     await db.insert(table).values(values);
   }
 
-  const caseRecord = await updateCaseProgress(caseId);
+  const caseRecord = await updateAggregateCaseProgress(caseId);
   return { success: true, progressPercent: caseRecord.progressPercent };
 }
 
@@ -83,7 +90,7 @@ export async function saveChildren(caseId: string, formData: FormData) {
       .set({ childrenReviewed: true, updatedAt: new Date() })
       .where(eq(cases.id, caseId));
 
-    const caseRecord = await updateCaseProgress(caseId);
+    const caseRecord = await updateAggregateCaseProgress(caseId);
     return { success: true, progressPercent: caseRecord.progressPercent };
   }
 
@@ -133,6 +140,6 @@ export async function saveChildren(caseId: string, formData: FormData) {
     .set({ childrenReviewed: true, updatedAt: new Date() })
     .where(eq(cases.id, caseId));
 
-  const caseRecord = await updateCaseProgress(caseId);
+  const caseRecord = await updateAggregateCaseProgress(caseId);
   return { success: true, progressPercent: caseRecord.progressPercent };
 }

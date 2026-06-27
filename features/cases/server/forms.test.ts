@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dbMock, updateCaseProgressMock } = vi.hoisted(() => ({
+const { dbMock, getQuestionnaireForCaseMock, updateCaseProgressMock } = vi.hoisted(() => ({
   dbMock: {
     select: vi.fn(),
     update: vi.fn(),
@@ -8,6 +8,7 @@ const { dbMock, updateCaseProgressMock } = vi.hoisted(() => ({
     delete: vi.fn(),
     transaction: vi.fn(),
   },
+  getQuestionnaireForCaseMock: vi.fn(),
   updateCaseProgressMock: vi.fn(),
 }));
 
@@ -19,6 +20,10 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/features/cases/server/cases", () => ({
   updateCaseProgress: updateCaseProgressMock,
+}));
+
+vi.mock("@/features/questionnaire/server/questionnaire", () => ({
+  getQuestionnaireForCase: getQuestionnaireForCaseMock,
 }));
 
 import {
@@ -88,6 +93,9 @@ function buildPersonForm(overrides: Record<string, string> = {}) {
 describe("case form persistence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getQuestionnaireForCaseMock.mockResolvedValue({
+      progress: { percent: 50 },
+    });
     updateCaseProgressMock.mockResolvedValue({ progressPercent: 42 });
   });
 
@@ -113,7 +121,7 @@ describe("case form persistence", () => {
       title: "Tyler & Van",
       updatedAt: expect.any(Date),
     }));
-    expect(updateCaseProgressMock).toHaveBeenCalledWith("case-1");
+    expect(updateCaseProgressMock).toHaveBeenCalledWith("case-1", 0.5);
   });
 
   it("inserts a petitioner when none exists", async () => {

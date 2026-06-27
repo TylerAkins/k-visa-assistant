@@ -66,3 +66,12 @@ Questions without `visibleWhen` are always visible. Conditional questions are vi
 - Date answers must be real calendar dates in `YYYY-MM-DD` format.
 - Boolean answers accept only yes or no values, and select answers must match a configured option value.
 - Required validation applies only to visible questions. Validation failures are returned by stable question key so the UI can display each error beside its field.
+
+## Progress Calculation
+
+- Section completion is derived from active question definitions and persisted answers; it is not stored separately.
+- A section must contain at least one active question, and every visible question must have a persisted answer row so an untouched section cannot count as complete.
+- Visible required answers must be present and valid. Optional answers may be saved as `null`, but non-null optional answers must still be valid for their question type.
+- Hidden conditional questions do not affect completion.
+- The four registered sections are weighted equally within the questionnaire's 30 percent share of overall case progress.
+- `questionnaire_case_state.completed_at` records when all active sections become complete and is cleared if a later valid save makes the questionnaire incomplete.

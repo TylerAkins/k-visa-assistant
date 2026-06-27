@@ -15,6 +15,7 @@ describe("case progress", () => {
         hasChildren: false,
         childrenReviewed: false,
         readyForQuestionnaire: false,
+        questionnaireCompletionRatio: 0,
       }),
     ).toBe(0);
   });
@@ -31,6 +32,7 @@ describe("case progress", () => {
         hasChildren: true,
         childrenReviewed: true,
         readyForQuestionnaire: true,
+        questionnaireCompletionRatio: 1,
       }),
     ).toBe(100);
   });
@@ -84,6 +86,40 @@ describe("case progress", () => {
     expect(calculateCaseProgress(state)).toBe(29);
   });
 
+  it.each([
+    [0, 70],
+    [0.25, 78],
+    [0.5, 85],
+    [0.75, 93],
+    [1, 100],
+  ])(
+    "allocates questionnaire completion ratio %s within the final 30 percent",
+    (questionnaireCompletionRatio, expectedProgress) => {
+      const completePerson = {
+        firstName: "Tyler",
+        lastName: "Akins",
+        dateOfBirth: "1990-01-01",
+        countryOfBirth: "United States",
+        citizenship: "United States",
+        email: "tyler@example.com",
+        phone: "555-111-2222",
+        street1: "123 Main St",
+        city: "Austin",
+        postalCode: "78701",
+        country: "United States",
+      };
+      const state = getCaseProgressState({
+        petitioner: completePerson,
+        beneficiary: completePerson,
+        childrenCount: 0,
+        childrenReviewed: true,
+        questionnaireCompletionRatio,
+      });
+
+      expect(calculateCaseProgress(state)).toBe(expectedProgress);
+    },
+  );
+
   it("allows the children section to be reviewed without child records", () => {
     const state = getCaseProgressState({
       petitioner: {
@@ -118,6 +154,6 @@ describe("case progress", () => {
 
     expect(state.hasChildren).toBe(false);
     expect(state.childrenReviewed).toBe(true);
-    expect(calculateCaseProgress(state)).toBe(100);
+    expect(calculateCaseProgress(state)).toBe(70);
   });
 });

@@ -26,7 +26,8 @@
 - Completing petitioner details adds 30 percent.
 - Completing beneficiary details adds 30 percent.
 - Reviewing children adds 10 percent.
-- Reaching the questionnaire-ready state adds 30 percent.
+- Completed questionnaire sections share the remaining 30 percent equally.
+- Questionnaire credit is rounded from the completed-section ratio, so one through four completed sections contribute 8, 15, 23, and 30 percent.
 - `features/cases/server/progress.ts` owns the calculation so future phases can extend it in one place.
 
 ## Future Expansion Strategy

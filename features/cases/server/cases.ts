@@ -13,8 +13,15 @@ import { getCurrentUser } from "@/features/auth/server/session";
 import type { CaseRecord, CaseStatus } from "@/features/cases/types";
 import { calculateCaseProgress, getCaseProgressState } from "./progress";
 
+export class CaseAccessError extends Error {
+  public constructor() {
+    super("Unauthorized access to case data.");
+    this.name = "CaseAccessError";
+  }
+}
+
 function notFoundOrUnauthorized(): never {
-  throw new Error("Unauthorized access to case data.");
+  throw new CaseAccessError();
 }
 
 export async function assertCaseOwnership(caseId: string) {
@@ -55,7 +62,10 @@ export async function listUserCases() {
   })) satisfies CaseRecord[];
 }
 
-export async function getCaseOverview(caseId: string) {
+export async function getCaseOverview(
+  caseId: string,
+  questionnaireCompletionRatio = 0,
+) {
   await assertCaseOwnership(caseId);
 
   const [caseRecord] = await db
@@ -119,6 +129,7 @@ export async function getCaseOverview(caseId: string) {
       : null,
     childrenCount: children.length,
     childrenReviewed: caseRecord.childrenReviewed,
+    questionnaireCompletionRatio,
   });
 
   const progressPercent =
@@ -149,8 +160,20 @@ export async function createCase(userId: string, title: string) {
   return caseRecord;
 }
 
-export async function updateCaseProgress(caseId: string) {
+export async function getPhase2CaseProgress(caseId: string) {
   const overview = await getCaseOverview(caseId);
+
+  return {
+    progressPercent: overview.case.progressPercent,
+    userId: overview.case.userId,
+  };
+}
+
+export async function updateCaseProgress(
+  caseId: string,
+  questionnaireCompletionRatio = 0,
+) {
+  const overview = await getCaseOverview(caseId, questionnaireCompletionRatio);
   const progressPercent = calculateCaseProgress(
     getCaseProgressState({
       petitioner: overview.petitioner
@@ -185,6 +208,7 @@ export async function updateCaseProgress(caseId: string) {
         : null,
       childrenCount: overview.children.length,
       childrenReviewed: overview.case.childrenReviewed,
+      questionnaireCompletionRatio,
     }),
   );
 

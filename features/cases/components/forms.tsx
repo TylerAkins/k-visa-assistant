@@ -219,6 +219,7 @@ export function CaseEditor({
         caseId={overview.case.id}
         questionnaire={questionnaire}
         saveSectionAction={saveQuestionnaireSectionAction}
+        onProgressChange={setProgressPercent}
       />
       <FutureFeaturePlaceholders />
     </div>

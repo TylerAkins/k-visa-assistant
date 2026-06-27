@@ -4,12 +4,18 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  cases,
   questionnaireAnswers,
   questionnaireCaseState,
   questionnaireQuestions,
   questionnaireSections,
 } from "@/db/schema";
-import { assertCaseOwnership } from "@/features/cases/server/cases";
+import {
+  assertCaseOwnership,
+  getPhase2CaseProgress,
+} from "@/features/cases/server/cases";
+import { calculateQuestionnaireProgressContribution } from "@/features/cases/server/progress";
+import { calculateQuestionnaireProgress } from "@/features/questionnaire/progress";
 import {
   assertCompleteQuestionnaireSectionIds,
   getQuestionnaireSectionMetadata,
@@ -62,6 +68,36 @@ function mapCaseState(
     reviewStatus: row.reviewStatus as QuestionnaireReviewStatus,
     updatedAt: row.updatedAt,
   };
+}
+
+function mapAnswers(
+  rows: (typeof questionnaireAnswers.$inferSelect)[],
+  sections: QuestionnaireSection[],
+): QuestionnaireAnswer[] {
+  const questionKeysById = new Map<string, string>();
+  for (const section of sections) {
+    for (const question of section.questions) {
+      questionKeysById.set(question.id, question.key);
+    }
+  }
+
+  return rows
+    .map((answer) => {
+      const questionKey = questionKeysById.get(answer.questionId);
+
+      if (!questionKey) {
+        return null;
+      }
+
+      return {
+        caseId: answer.caseId,
+        questionId: answer.questionId,
+        questionKey,
+        value: answer.value as QuestionnaireAnswerValue,
+        updatedAt: answer.updatedAt,
+      } satisfies QuestionnaireAnswer;
+    })
+    .filter((answer): answer is QuestionnaireAnswer => Boolean(answer));
 }
 
 export async function listQuestionnaireDefinition(): Promise<
@@ -124,12 +160,6 @@ export async function getQuestionnaireForCase(
   await assertCaseOwnership(caseId);
 
   const sections = await listQuestionnaireDefinition();
-  const questionKeysById = new Map<string, string>();
-  for (const section of sections) {
-    for (const question of section.questions) {
-      questionKeysById.set(question.id, question.key);
-    }
-  }
 
   const [answers, stateRows] = await Promise.all([
     db
@@ -143,26 +173,13 @@ export async function getQuestionnaireForCase(
       .limit(1),
   ]);
 
+  const mappedAnswers = mapAnswers(answers, sections);
+
   return {
     sections,
-    answers: answers
-      .map((answer) => {
-        const questionKey = questionKeysById.get(answer.questionId);
-
-        if (!questionKey) {
-          return null;
-        }
-
-        return {
-          caseId: answer.caseId,
-          questionId: answer.questionId,
-          questionKey,
-          value: answer.value as QuestionnaireAnswerValue,
-          updatedAt: answer.updatedAt,
-        } satisfies QuestionnaireAnswer;
-      })
-      .filter((answer): answer is QuestionnaireAnswer => Boolean(answer)),
+    answers: mappedAnswers,
     state: stateRows[0] ? mapCaseState(stateRows[0]) : null,
+    progress: calculateQuestionnaireProgress(sections, mappedAnswers),
   };
 }
 
@@ -171,7 +188,10 @@ export async function saveQuestionnaireSectionAnswers(
   sectionKey: string,
   formData: FormData,
 ): Promise<QuestionnaireSectionSaveResult> {
-  const questionnaire = await getQuestionnaireForCase(caseId);
+  const [questionnaire, phase2Progress] = await Promise.all([
+    getQuestionnaireForCase(caseId),
+    getPhase2CaseProgress(caseId),
+  ]);
   const section = questionnaire.sections.find((item) => item.key === sectionKey);
 
   if (!section) {
@@ -203,8 +223,40 @@ export async function saveQuestionnaireSectionAnswers(
     return { ...answer, questionId };
   });
   const now = new Date();
+  const sectionQuestionIds = new Set(
+    section.questions.map((question) => question.id),
+  );
 
-  await db.transaction(async (tx) => {
+  const saveResult = await db.transaction(async (tx) => {
+    const [lockedCase] = await tx
+      .select({ id: cases.id })
+      .from(cases)
+      .where(
+        and(
+          eq(cases.id, caseId),
+          eq(cases.userId, phase2Progress.userId),
+        ),
+      )
+      .for("update");
+
+    if (!lockedCase) {
+      throw new Error("Unable to lock case for questionnaire progress update.");
+    }
+
+    const currentAnswerRows = await tx
+      .select()
+      .from(questionnaireAnswers)
+      .where(eq(questionnaireAnswers.caseId, caseId));
+    const [currentStateRow] = await tx
+      .select()
+      .from(questionnaireCaseState)
+      .where(eq(questionnaireCaseState.caseId, caseId))
+      .limit(1);
+    const currentAnswers = mapAnswers(
+      currentAnswerRows,
+      questionnaire.sections,
+    );
+
     for (const questionId of validationResult.hiddenQuestionIds) {
       await tx
         .delete(questionnaireAnswers)
@@ -233,9 +285,71 @@ export async function saveQuestionnaireSectionAnswers(
           },
         });
     }
+
+    const nextAnswers = [
+      ...currentAnswers.filter(
+        (answer) => !sectionQuestionIds.has(answer.questionId),
+      ),
+      ...answers.map(
+        (answer) =>
+          ({
+            caseId,
+            questionId: answer.questionId,
+            questionKey: answer.questionKey,
+            value: answer.value,
+            updatedAt: now,
+          }) satisfies QuestionnaireAnswer,
+      ),
+    ];
+    const questionnaireProgress = calculateQuestionnaireProgress(
+      questionnaire.sections,
+      nextAnswers,
+    );
+    const currentState = currentStateRow ? mapCaseState(currentStateRow) : null;
+    const completedAt =
+      questionnaireProgress.percent === 100
+        ? currentState?.completedAt ?? now
+        : null;
+
+    await tx
+      .insert(questionnaireCaseState)
+      .values({
+        caseId,
+        completedAt,
+        reviewedAt: currentState?.reviewedAt ?? null,
+        reviewStatus: currentState?.reviewStatus ?? "not_started",
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: questionnaireCaseState.caseId,
+        set: { completedAt, updatedAt: now },
+      });
+
+    const progressPercent = Math.min(
+      100,
+      phase2Progress.progressPercent +
+        calculateQuestionnaireProgressContribution(
+          questionnaireProgress.percent / 100,
+        ),
+    );
+
+    await tx
+      .update(cases)
+      .set({ progressPercent, updatedAt: now })
+      .where(
+        and(
+          eq(cases.id, caseId),
+          eq(cases.userId, phase2Progress.userId),
+        ),
+      );
+
+    return { progressPercent, questionnaireProgress };
   });
 
-  return { success: true };
+  return {
+    success: true,
+    ...saveResult,
+  };
 }
 
 export async function updateQuestionnaireCaseState(

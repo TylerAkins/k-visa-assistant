@@ -69,6 +69,7 @@ describe("case types", () => {
       hasChildren: false,
       childrenReviewed: true,
       readyForQuestionnaire: false,
+      questionnaireCompletionRatio: 0,
     };
 
     expect(progress.petitionerCompletionRatio).toBe(1);

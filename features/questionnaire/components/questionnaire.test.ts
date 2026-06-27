@@ -84,7 +84,19 @@ const questionnaire = {
     },
   ],
   state: null,
+  progress: {
+    completedSections: 0,
+    totalSections: 1,
+    percent: 0,
+    sections: [{ sectionKey: "relationship", complete: false }],
+  },
 } satisfies QuestionnaireForCase;
+
+const successfulSave = {
+  success: true as const,
+  progressPercent: 70,
+  questionnaireProgress: questionnaire.progress,
+};
 
 describe("QuestionnaireWorkflow", () => {
   it("renders definition-driven question fields with stable names", () => {
@@ -92,11 +104,13 @@ describe("QuestionnaireWorkflow", () => {
       React.createElement(QuestionnaireWorkflow, {
         caseId: "case-1",
         questionnaire,
-        saveSectionAction: async () => ({ success: true }),
+        saveSectionAction: async () => successfulSave,
       }),
     );
 
     expect(html).toContain("Relationship");
+    expect(html).toContain("0 of 1 sections complete");
+    expect(html).toContain("Incomplete");
     expect(html).toContain("Have you met in person?");
     expect(html).toContain('name="met_in_person"');
     expect(html).toContain("Relationship history");
@@ -124,7 +138,7 @@ describe("QuestionnaireWorkflow", () => {
             },
           ],
         },
-        saveSectionAction: async () => ({ success: true }),
+        saveSectionAction: async () => successfulSave,
       }),
     );
 
@@ -140,7 +154,7 @@ describe("QuestionnaireWorkflow", () => {
           ...questionnaire,
           answers: [],
         },
-        saveSectionAction: async () => ({ success: true }),
+        saveSectionAction: async () => successfulSave,
       }),
     );
 
