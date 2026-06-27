@@ -99,6 +99,32 @@ export type QuestionnaireForCase = {
   progress: QuestionnaireProgress;
 };
 
+export type QuestionnaireReviewAnswerStatus =
+  | "answered"
+  | "not_provided"
+  | "missing"
+  | "invalid";
+
+export type QuestionnaireReviewQuestion = {
+  key: string;
+  label: string;
+  displayValue: string;
+  status: QuestionnaireReviewAnswerStatus;
+  error: string | null;
+};
+
+export type QuestionnaireReviewSection = {
+  key: QuestionnaireSectionId;
+  title: string;
+  description: string | null;
+  complete: boolean;
+  questions: QuestionnaireReviewQuestion[];
+};
+
+export type QuestionnaireReview = {
+  sections: QuestionnaireReviewSection[];
+};
+
 export type QuestionnaireFieldErrors = Record<string, string[]>;
 
 export type QuestionnaireSectionSaveResult =

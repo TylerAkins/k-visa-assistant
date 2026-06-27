@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -76,6 +77,12 @@ export function QuestionnaireWorkflow({
           />
         ))}
       </div>
+      <Link
+        href={`/cases/${caseId}/review`}
+        className={buttonVariants({ variant: "secondary" })}
+      >
+        Review answers
+      </Link>
     </section>
   );
 }
@@ -133,7 +140,7 @@ function QuestionnaireSectionForm({
   }
 
   return (
-    <Card>
+    <Card id={`questionnaire-section-${section.key}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3">
           <CardTitle>{section.title}</CardTitle>
