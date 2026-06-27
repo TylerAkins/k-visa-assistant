@@ -98,7 +98,98 @@ const successfulSave = {
   questionnaireProgress: questionnaire.progress,
 };
 
+const petitionerQuestionnaire = {
+  ...questionnaire,
+  sections: [
+    {
+      id: "section-petitioner",
+      key: "petitioner",
+      title: "Petitioner",
+      description: "U.S. citizen petitioner information for the case.",
+      sortOrder: 10,
+      questions: [
+        {
+          id: "question-petitioner-other-names",
+          key: "petitioner_other_names",
+          label: "Other names used",
+          helpText: "List prior legal names, aliases, or maiden names.",
+          questionType: "textarea",
+          required: false,
+          sortOrder: 10,
+          config: null,
+        },
+        {
+          id: "question-petitioner-citizenship-basis",
+          key: "petitioner_citizenship_basis",
+          label: "Citizenship basis",
+          helpText: null,
+          questionType: "select",
+          required: true,
+          sortOrder: 20,
+          config: {
+            options: [
+              { label: "Birth in the United States", value: "birth_us" },
+              { label: "Naturalization", value: "naturalization" },
+              { label: "Certificate of citizenship", value: "certificate" },
+            ],
+          },
+        },
+      ],
+    },
+    ...questionnaire.sections,
+  ],
+  answers: [
+    {
+      caseId: "case-1",
+      questionId: "question-petitioner-other-names",
+      questionKey: "petitioner_other_names",
+      value: "Taylor Previous",
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+    {
+      caseId: "case-1",
+      questionId: "question-petitioner-citizenship-basis",
+      questionKey: "petitioner_citizenship_basis",
+      value: "naturalization",
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
+  ],
+  progress: {
+    completedSections: 1,
+    totalSections: 2,
+    percent: 50,
+    sections: [
+      { sectionKey: "petitioner", complete: true },
+      { sectionKey: "relationship", complete: false },
+    ],
+  },
+} satisfies QuestionnaireForCase;
+
 describe("QuestionnaireWorkflow", () => {
+  it("renders saved petitioner answers first in configured question order", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: petitionerQuestionnaire,
+        saveSectionAction: async () => ({
+          ...successfulSave,
+          questionnaireProgress: petitionerQuestionnaire.progress,
+        }),
+      }),
+    );
+
+    expect(html.indexOf("questionnaire-section-petitioner")).toBeLessThan(
+      html.indexOf("questionnaire-section-relationship"),
+    );
+    expect(html.indexOf('name="petitioner_other_names"')).toBeLessThan(
+      html.indexOf('name="petitioner_citizenship_basis"'),
+    );
+    expect(html).toContain("Taylor Previous");
+    expect(html).toContain(
+      '<option value="naturalization" selected="">Naturalization</option>',
+    );
+  });
+
   it("renders definition-driven question fields with stable names", () => {
     const html = renderToStaticMarkup(
       React.createElement(QuestionnaireWorkflow, {

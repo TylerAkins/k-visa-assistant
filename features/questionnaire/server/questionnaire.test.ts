@@ -178,6 +178,34 @@ const waiverQuestion = {
   },
 };
 
+const petitionerOtherNamesQuestion = {
+  ...activeQuestion,
+  id: "question-petitioner-other-names",
+  key: "petitioner_other_names",
+  label: "Other names used",
+  helpText: "List prior legal names, aliases, or maiden names.",
+  questionType: "textarea",
+  required: false,
+  sortOrder: 10,
+};
+
+const petitionerCitizenshipBasisQuestion = {
+  ...activeQuestion,
+  id: "question-petitioner-citizenship-basis",
+  key: "petitioner_citizenship_basis",
+  label: "Citizenship basis",
+  questionType: "select",
+  required: true,
+  sortOrder: 20,
+  config: {
+    options: [
+      { label: "Birth in the United States", value: "birth_us" },
+      { label: "Naturalization", value: "naturalization" },
+      { label: "Certificate of citizenship", value: "certificate" },
+    ],
+  },
+};
+
 describe("questionnaire data access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -191,26 +219,45 @@ describe("questionnaire data access", () => {
     });
   });
 
-  it("creates and reads answers for an owned case", async () => {
+  it("creates and reloads petitioner answers for an owned case", async () => {
     const savedAt = new Date("2026-02-01T00:00:00.000Z");
     const transaction = createTransactionQuery();
     const formData = new FormData();
-    formData.set("met_in_person", "true");
+    formData.set("petitioner_other_names", "  Taylor Previous  ");
+    formData.set("petitioner_citizenship_basis", "naturalization");
 
     mockDb.select
       .mockReturnValueOnce(createSelectQuery(completeSections))
-      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(
+        createSelectQuery([
+          petitionerOtherNamesQuestion,
+          petitionerCitizenshipBasisQuestion,
+        ]),
+      )
       .mockReturnValueOnce(createSelectQuery([]))
       .mockReturnValueOnce(createSelectQuery([]))
       .mockReturnValueOnce(createSelectQuery(completeSections))
-      .mockReturnValueOnce(createSelectQuery([activeQuestion]))
+      .mockReturnValueOnce(
+        createSelectQuery([
+          petitionerOtherNamesQuestion,
+          petitionerCitizenshipBasisQuestion,
+        ]),
+      )
       .mockReturnValueOnce(
         createSelectQuery([
           {
-            id: "answer-1",
+            id: "answer-other-names",
             caseId: "case-1",
-            questionId: "question-1",
-            value: true,
+            questionId: "question-petitioner-other-names",
+            value: "Taylor Previous",
+            createdAt: savedAt,
+            updatedAt: savedAt,
+          },
+          {
+            id: "answer-citizenship-basis",
+            caseId: "case-1",
+            questionId: "question-petitioner-citizenship-basis",
+            value: "naturalization",
             createdAt: savedAt,
             updatedAt: savedAt,
           },
@@ -233,8 +280,15 @@ describe("questionnaire data access", () => {
     expect(transaction.values).toHaveBeenCalledWith(
       expect.objectContaining({
         caseId: "case-1",
-        questionId: "question-1",
-        value: true,
+        questionId: "question-petitioner-other-names",
+        value: "Taylor Previous",
+      }),
+    );
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: "case-1",
+        questionId: "question-petitioner-citizenship-basis",
+        value: "naturalization",
       }),
     );
     expect(transaction.updateSet).toHaveBeenCalledWith(
@@ -247,13 +301,21 @@ describe("questionnaire data access", () => {
     expect(questionnaire.sections[0]).toMatchObject({
       key: "petitioner",
       sortOrder: 10,
-      questions: [{ key: "met_in_person" }],
+      questions: [
+        { key: "petitioner_other_names", sortOrder: 10 },
+        { key: "petitioner_citizenship_basis", sortOrder: 20 },
+      ],
     });
     expect(questionnaire.answers).toEqual([
       expect.objectContaining({
         caseId: "case-1",
-        questionKey: "met_in_person",
-        value: true,
+        questionKey: "petitioner_other_names",
+        value: "Taylor Previous",
+      }),
+      expect.objectContaining({
+        caseId: "case-1",
+        questionKey: "petitioner_citizenship_basis",
+        value: "naturalization",
       }),
     ]);
     expect(questionnaire.state).toBeNull();
@@ -437,6 +499,35 @@ describe("questionnaire data access", () => {
       success: false,
       fieldErrors: {
         met_in_person: ['Choose yes or no for "Have you met in person?".'],
+      },
+    });
+
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing required petitioner answer before writing", async () => {
+    const formData = new FormData();
+    formData.set("petitioner_other_names", "Taylor Previous");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(
+        createSelectQuery([
+          petitionerOtherNamesQuestion,
+          petitionerCitizenshipBasisQuestion,
+        ]),
+      )
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "petitioner", formData),
+    ).resolves.toEqual({
+      success: false,
+      fieldErrors: {
+        petitioner_citizenship_basis: [
+          'Please answer "Citizenship basis" before saving.',
+        ],
       },
     });
 
