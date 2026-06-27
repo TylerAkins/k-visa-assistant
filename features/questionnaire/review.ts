@@ -1,4 +1,5 @@
 import { isQuestionVisible } from "@/features/questionnaire/conditions";
+import { isPersistedChildComplete } from "@/features/cases/validation/schemas";
 import { isQuestionnaireSectionComplete } from "@/features/questionnaire/progress";
 import type {
   QuestionnaireAnswerValue,
@@ -20,6 +21,49 @@ export function buildQuestionnaireReview(
 
   return {
     sections: questionnaire.sections.map((section) => {
+      if (section.key === "children") {
+        const complete =
+          questionnaire.progress.sections.find(
+            (item) => item.sectionKey === "children",
+          )?.complete ?? false;
+        const questions: QuestionnaireReviewQuestion[] =
+          questionnaire.children.length === 0
+            ? [
+                {
+                  key: "children",
+                  label: "K-2 children",
+                  displayValue: questionnaire.childrenReviewed
+                    ? "No K-2 children"
+                    : notProvidedLabel,
+                  status: questionnaire.childrenReviewed ? "answered" : "missing",
+                  error: questionnaire.childrenReviewed
+                    ? null
+                    : "Review whether the beneficiary has K-2 children.",
+                },
+              ]
+            : questionnaire.children.map((child, index) => {
+                const childComplete = isPersistedChildComplete(child);
+
+                return {
+                  key: `child-${child.id}`,
+                  label: `Child ${index + 1}: ${[child.firstName, child.middleName, child.lastName].filter(Boolean).join(" ")}`,
+                  displayValue: formatChildSummary(child),
+                  status: childComplete ? "answered" : "invalid",
+                  error: childComplete
+                    ? null
+                    : "Complete all required identity and residence details.",
+                };
+              });
+
+        return {
+          key: section.key,
+          title: section.title,
+          description: section.description,
+          complete,
+          questions,
+        };
+      }
+
       const visibleAnswers = new Map(answersByQuestionKey);
       const questions: QuestionnaireReviewQuestion[] = [];
 
@@ -44,6 +88,38 @@ export function buildQuestionnaireReview(
       };
     }),
   };
+}
+
+function formatChildSummary(
+  child: QuestionnaireForCase["children"][number],
+): string {
+  const details = [
+    child.dateOfBirth
+      ? `Date of birth: ${child.dateOfBirth.toISOString().slice(0, 10)}`
+      : "Date of birth: Not provided",
+    `Country of birth: ${child.countryOfBirth ?? notProvidedLabel}`,
+    `Relationship: ${child.relationshipType || notProvidedLabel}`,
+    child.residesWithBeneficiary === null
+      ? "Lives with beneficiary: Not provided"
+      : `Lives with beneficiary: ${child.residesWithBeneficiary ? "Yes" : "No"}`,
+  ];
+
+  if (child.residesWithBeneficiary === false) {
+    details.push(
+      `Address: ${[
+        child.street1,
+        child.street2,
+        child.city,
+        child.province,
+        child.postalCode,
+        child.country,
+      ]
+        .filter(Boolean)
+        .join(", ") || notProvidedLabel}`,
+    );
+  }
+
+  return details.join("\n");
 }
 
 function buildReviewQuestion(

@@ -1,8 +1,9 @@
 "use client";
 
-import type { ChangeEventHandler, FocusEvent, RefObject } from "react";
+import type { ChangeEventHandler, RefObject } from "react";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ type CaseActionState = {
   success: boolean;
   error?: string;
   progressPercent?: number;
+  fieldErrors?: Record<string, string[]>;
 };
 
 type FormAction = (payload: FormData) => void;
@@ -51,8 +53,16 @@ type ChildFormValues = {
   middleName: string | null;
   lastName: string;
   dateOfBirth: Date | null;
+  countryOfBirth: string | null;
   citizenship: string | null;
   relationshipType: string;
+  residesWithBeneficiary: boolean | null;
+  street1: string | null;
+  street2: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  country: string | null;
 };
 
 const relationshipOptions = ["Child", "Stepchild", "Adopted child"];
@@ -209,17 +219,21 @@ export function CaseEditor({
         />
       </div>
 
-      <ChildForm
-        caseId={overview.case.id}
-        childRecords={overview.children}
-        saveAction={saveChildrenAction}
-        onProgressChange={setProgressPercent}
-      />
       <QuestionnaireWorkflow
+        key={`${questionnaire.progress.percent}-${overview.case.childrenReviewed}-${overview.children.length}`}
         caseId={overview.case.id}
         questionnaire={questionnaire}
         saveSectionAction={saveQuestionnaireSectionAction}
         onProgressChange={setProgressPercent}
+        childrenSection={
+          <ChildForm
+            caseId={overview.case.id}
+            childRecords={overview.children}
+            childrenReviewed={overview.case.childrenReviewed}
+            saveAction={saveChildrenAction}
+            onProgressChange={setProgressPercent}
+          />
+        }
       />
       <FutureFeaturePlaceholders />
     </div>
@@ -462,25 +476,28 @@ export function PersonForm({
 export function ChildForm({
   caseId,
   childRecords,
+  childrenReviewed,
   saveAction,
   onProgressChange,
 }: {
   caseId: string;
   childRecords: ChildFormValues[];
+  childrenReviewed: boolean;
   saveAction: (caseId: string, formData: FormData) => Promise<CaseActionState>;
   onProgressChange?: (progressPercent: number) => void;
 }) {
-  const formRef = useRef<HTMLFormElement>(null);
-  const initialEnabled = childRecords.length > 0 ? "yes" : "no";
+  const router = useRouter();
+  const initialEnabled = childRecords.length > 0 ? "yes" : childrenReviewed ? "no" : "";
   const [hasChildren, setHasChildren] = useState(initialEnabled);
   const [childCount, setChildCount] = useState(Math.max(childRecords.length, 1));
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [reviewed, setReviewed] = useState(childrenReviewed);
   const [saveState, formAction, pending] = useActionState(
     async (_state: CaseActionState, formData: FormData) => {
       const result = await saveAction(caseId, formData);
 
       if (result.success) {
-        setLastSavedAt(new Date());
+        setReviewed(true);
+        router.refresh();
         if (typeof result.progressPercent === "number") {
           onProgressChange?.(result.progressPercent);
         }
@@ -491,30 +508,6 @@ export function ChildForm({
     { success: false },
   );
   const activeChildCount = hasChildren === "yes" ? childCount : 0;
-  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const queueAutosave = () => {
-    if (autosaveTimeoutRef.current) {
-      clearTimeout(autosaveTimeoutRef.current);
-    }
-
-    autosaveTimeoutRef.current = setTimeout(() => {
-      submitAutosave(formRef, formAction);
-    }, 650);
-  };
-  const saveOnSectionExit = (event: FocusEvent<HTMLFormElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) {
-      submitAutosave(formRef, formAction);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (autosaveTimeoutRef.current) {
-        clearTimeout(autosaveTimeoutRef.current);
-      }
-    };
-  }, []);
-
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -525,17 +518,16 @@ export function ChildForm({
               Enable this only if the beneficiary has eligible children to include.
             </p>
           </div>
-          <AutosaveStatus pending={pending} lastSavedAt={lastSavedAt} />
+          <Badge variant={reviewed ? "default" : "secondary"}>
+            {reviewed ? "Reviewed" : "Not reviewed"}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
         <FormMessage message={saveState.error} />
         <form
-          ref={formRef}
           action={formAction}
           className="space-y-5"
-          onChange={queueAutosave}
-          onBlur={saveOnSectionExit}
         >
           <div className="grid gap-4 md:grid-cols-[1fr_12rem]">
             <SelectGroup
@@ -543,6 +535,7 @@ export function ChildForm({
               name="hasChildren"
               value={hasChildren}
               onChange={(event) => setHasChildren(event.currentTarget.value)}
+              error={saveState.fieldErrors?.hasChildren?.[0]}
               options={[
                 { label: "No K-2 children", value: "no" },
                 { label: "Yes, include K-2 children", value: "yes" },
@@ -556,6 +549,7 @@ export function ChildForm({
                 onChange={(event) =>
                   setChildCount(Number(event.currentTarget.value))
                 }
+                error={saveState.fieldErrors?.childCount?.[0]}
                 options={Array.from({ length: 10 }, (_, index) => ({
                   label: String(index + 1),
                   value: String(index + 1),
@@ -577,51 +571,72 @@ export function ChildForm({
                 <h3 className="mb-4 text-sm font-medium">
                   Child {index + 1}
                 </h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <InputGroup
-                    label="First name"
-                    name={`children.${index}.firstName`}
-                    defaultValue={child?.firstName}
-                  />
-                  <InputGroup
-                    label="Middle name"
-                    name={`children.${index}.middleName`}
-                    defaultValue={child?.middleName}
-                  />
-                  <InputGroup
-                    label="Last name"
-                    name={`children.${index}.lastName`}
-                    defaultValue={child?.lastName}
-                  />
-                  <InputGroup
-                    label="Date of birth"
-                    name={`children.${index}.dateOfBirth`}
-                    type="date"
-                    defaultValue={formatDateInput(child?.dateOfBirth)}
-                  />
-                  <SelectGroup
-                    label="Citizenship"
-                    name={`children.${index}.citizenship`}
-                    defaultValue={child?.citizenship}
-                    options={kVisaCountryOptions}
-                  />
-                  <SelectGroup
-                    label="Relationship type"
-                    name={`children.${index}.relationshipType`}
-                    defaultValue={child?.relationshipType}
-                    options={relationshipOptions}
-                  />
-                </div>
+                {child ? (
+                  <input type="hidden" name={`children.${index}.id`} value={child.id} />
+                ) : null}
+                <ChildFields index={index} child={child} errors={saveState.fieldErrors} />
               </div>
             );
           })}
 
-          <button type="submit" className="sr-only" disabled={pending}>
-            Save K-2 children
-          </button>
+          <Button type="submit" disabled={pending || hasChildren === ""}>
+            {pending ? "Saving..." : "Save children section"}
+          </Button>
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+function ChildFields({
+  index,
+  child,
+  errors,
+}: {
+  index: number;
+  child: ChildFormValues | undefined;
+  errors?: Record<string, string[]>;
+}) {
+  const prefix = `children.${index}`;
+  const [residesWithBeneficiary, setResidesWithBeneficiary] = useState(
+    child?.residesWithBeneficiary === null ||
+      child?.residesWithBeneficiary === undefined
+      ? ""
+      : child.residesWithBeneficiary
+        ? "yes"
+        : "no",
+  );
+  const fieldError = (field: string) => errors?.[`${prefix}.${field}`]?.[0];
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <InputGroup label="First name" name={`${prefix}.firstName`} defaultValue={child?.firstName} required error={fieldError("firstName")} />
+      <InputGroup label="Middle name" name={`${prefix}.middleName`} defaultValue={child?.middleName} />
+      <InputGroup label="Last name" name={`${prefix}.lastName`} defaultValue={child?.lastName} required error={fieldError("lastName")} />
+      <InputGroup label="Date of birth" name={`${prefix}.dateOfBirth`} type="date" defaultValue={formatDateInput(child?.dateOfBirth)} required error={fieldError("dateOfBirth")} />
+      <SelectGroup label="Country of birth" name={`${prefix}.countryOfBirth`} defaultValue={child?.countryOfBirth} options={kVisaCountryOptions} required error={fieldError("countryOfBirth")} />
+      <SelectGroup label="Citizenship" name={`${prefix}.citizenship`} defaultValue={child?.citizenship} options={kVisaCountryOptions} />
+      <SelectGroup label="Relationship type" name={`${prefix}.relationshipType`} defaultValue={child?.relationshipType} options={relationshipOptions} required error={fieldError("relationshipType")} />
+      <SelectGroup
+        label="Lives with beneficiary?"
+        name={`${prefix}.residesWithBeneficiary`}
+        value={residesWithBeneficiary}
+        onChange={(event) => setResidesWithBeneficiary(event.currentTarget.value)}
+        options={[{ label: "Yes", value: "yes" }, { label: "No", value: "no" }]}
+        required
+        error={fieldError("residesWithBeneficiary")}
+      />
+      {residesWithBeneficiary === "no" ? (
+        <>
+          <InputGroup label="Street address" name={`${prefix}.street1`} defaultValue={child?.street1} required error={fieldError("street1")} />
+          <InputGroup label="Address line 2" name={`${prefix}.street2`} defaultValue={child?.street2} />
+          <InputGroup label="City" name={`${prefix}.city`} defaultValue={child?.city} required error={fieldError("city")} />
+          <InputGroup label="Province or region" name={`${prefix}.province`} defaultValue={child?.province} />
+          <InputGroup label="Postal code" name={`${prefix}.postalCode`} defaultValue={child?.postalCode} required error={fieldError("postalCode")} />
+          <SelectGroup label="Country" name={`${prefix}.country`} defaultValue={child?.country} options={kVisaCountryOptions} required error={fieldError("country")} />
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -631,12 +646,14 @@ function InputGroup({
   type = "text",
   defaultValue,
   required = false,
+  error,
 }: {
   label: string;
   name: string;
   type?: string;
   defaultValue?: string | null;
   required?: boolean;
+  error?: string;
 }) {
   const [value, setValue] = useState(defaultValue ?? "");
 
@@ -650,7 +667,10 @@ function InputGroup({
         value={value}
         onChange={(event) => setValue(event.currentTarget.value)}
         required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${name}-error` : undefined}
       />
+      {error ? <p id={`${name}-error`} className="text-sm text-destructive" role="alert">{error}</p> : null}
     </div>
   );
 }
@@ -663,6 +683,7 @@ function SelectGroup({
   value,
   onChange,
   required = false,
+  error,
 }: {
   label: string;
   name: string;
@@ -671,6 +692,7 @@ function SelectGroup({
   value?: string;
   onChange?: ChangeEventHandler<HTMLSelectElement>;
   required?: boolean;
+  error?: string;
 }) {
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const selectedValue = value ?? internalValue;
@@ -691,6 +713,8 @@ function SelectGroup({
             onChange?.(event);
           }}
           required={required}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${name}-error` : undefined}
           className={cn(
             "h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-input/30 px-3 pr-9 text-sm text-foreground shadow-inner outline-none transition-colors hover:border-ring/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50",
           )}
@@ -714,6 +738,7 @@ function SelectGroup({
           className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
         />
       </div>
+      {error ? <p id={`${name}-error`} className="text-sm text-destructive" role="alert">{error}</p> : null}
     </div>
   );
 }

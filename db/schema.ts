@@ -229,8 +229,17 @@ export const k2Children = pgTable(
     middleName: text("middle_name"),
     lastName: text("last_name").notNull(),
     dateOfBirth: timestamp("date_of_birth", { withTimezone: false }),
+    countryOfBirth: text("country_of_birth"),
     citizenship: text("citizenship"),
     relationshipType: text("relationship_type").notNull().default("child"),
+    residesWithBeneficiary: boolean("resides_with_beneficiary"),
+    street1: text("street1"),
+    street2: text("street2"),
+    city: text("city"),
+    province: text("province"),
+    postalCode: text("postal_code"),
+    country: text("country"),
+    sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

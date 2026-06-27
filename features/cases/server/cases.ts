@@ -94,7 +94,7 @@ export async function getCaseOverview(
     .select()
     .from(k2Children)
     .where(eq(k2Children.caseId, caseId))
-    .orderBy(asc(k2Children.createdAt));
+    .orderBy(asc(k2Children.sortOrder), asc(k2Children.createdAt));
 
   const progressState = getCaseProgressState({
     petitioner: petitioner
@@ -143,6 +143,29 @@ export async function getCaseOverview(
     beneficiary: beneficiary ?? null,
     children,
   };
+}
+
+export async function getCaseChildrenState(caseId: string) {
+  await assertCaseOwnership(caseId);
+
+  const [caseRows, children] = await Promise.all([
+    db
+      .select({ childrenReviewed: cases.childrenReviewed })
+      .from(cases)
+      .where(eq(cases.id, caseId))
+      .limit(1),
+    db
+      .select()
+      .from(k2Children)
+      .where(eq(k2Children.caseId, caseId))
+      .orderBy(asc(k2Children.sortOrder), asc(k2Children.createdAt)),
+  ]);
+
+  if (!caseRows[0]) {
+    notFoundOrUnauthorized();
+  }
+
+  return { children, reviewed: caseRows[0].childrenReviewed };
 }
 
 export async function createCase(userId: string, title: string) {

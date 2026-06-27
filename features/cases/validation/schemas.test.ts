@@ -90,9 +90,44 @@ describe("case validation schemas", () => {
         middleName: "",
         lastName: "Nguyen",
         dateOfBirth: "2018-01-01",
+        countryOfBirth: "Vietnam",
         citizenship: "Vietnam",
-        relationshipType: "stepchild",
+        relationshipType: "Stepchild",
+        residesWithBeneficiary: "yes",
       }).success,
     ).toBe(true);
+  });
+
+  it("requires a complete address only when a child lives elsewhere", () => {
+    const baseChild = {
+      firstName: "Kai",
+      middleName: "",
+      lastName: "Nguyen",
+      dateOfBirth: "2018-01-01",
+      countryOfBirth: "Vietnam",
+      citizenship: "Vietnam",
+      relationshipType: "Child",
+    };
+
+    expect(childSchema.safeParse({
+      ...baseChild,
+      residesWithBeneficiary: "yes",
+    }).success).toBe(true);
+    expect(childSchema.safeParse({
+      ...baseChild,
+      residesWithBeneficiary: "no",
+      street1: "",
+      city: "",
+      postalCode: "",
+      country: "",
+    }).success).toBe(false);
+    expect(childSchema.safeParse({
+      ...baseChild,
+      residesWithBeneficiary: "no",
+      street1: "1 Main St",
+      city: "Hanoi",
+      postalCode: "100000",
+      country: "Vietnam",
+    }).success).toBe(true);
   });
 });

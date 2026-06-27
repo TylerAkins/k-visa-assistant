@@ -1,4 +1,6 @@
 import { isQuestionVisible } from "@/features/questionnaire/conditions";
+import type { ChildSummary } from "@/features/cases/types";
+import { isPersistedChildComplete } from "@/features/cases/validation/schemas";
 import type {
   QuestionnaireAnswer,
   QuestionnaireAnswerValue,
@@ -10,13 +12,17 @@ import { parseQuestionnaireAnswer } from "@/features/questionnaire/validation/an
 export function calculateQuestionnaireProgress(
   sections: readonly QuestionnaireSection[],
   answers: readonly QuestionnaireAnswer[],
+  childState?: { children: readonly ChildSummary[]; reviewed: boolean },
 ): QuestionnaireProgress {
   const answersByQuestionKey = new Map<string, QuestionnaireAnswerValue>(
     answers.map((answer) => [answer.questionKey, answer.value]),
   );
   const sectionProgress = sections.map((section) => ({
     sectionKey: section.key,
-    complete: isQuestionnaireSectionComplete(section, answersByQuestionKey),
+    complete:
+      section.key === "children" && childState
+        ? isChildrenSectionComplete(childState.children, childState.reviewed)
+        : isQuestionnaireSectionComplete(section, answersByQuestionKey),
   }));
   const completedSections = sectionProgress.filter(
     (section) => section.complete,
@@ -31,6 +37,13 @@ export function calculateQuestionnaireProgress(
         : Math.round((completedSections / sectionProgress.length) * 100),
     sections: sectionProgress,
   };
+}
+
+export function isChildrenSectionComplete(
+  children: readonly ChildSummary[],
+  reviewed: boolean,
+): boolean {
+  return reviewed && children.every(isPersistedChildComplete);
 }
 
 export function isQuestionnaireSectionComplete(

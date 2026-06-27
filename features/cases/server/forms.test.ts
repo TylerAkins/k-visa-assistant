@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dbMock, getQuestionnaireForCaseMock, updateCaseProgressMock } = vi.hoisted(() => ({
+const {
+  dbMock,
+  getQuestionnaireForCaseMock,
+  updateCaseProgressMock,
+  updateQuestionnaireCaseStateMock,
+} = vi.hoisted(() => ({
   dbMock: {
     select: vi.fn(),
     update: vi.fn(),
@@ -10,6 +15,7 @@ const { dbMock, getQuestionnaireForCaseMock, updateCaseProgressMock } = vi.hoist
   },
   getQuestionnaireForCaseMock: vi.fn(),
   updateCaseProgressMock: vi.fn(),
+  updateQuestionnaireCaseStateMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -24,6 +30,7 @@ vi.mock("@/features/cases/server/cases", () => ({
 
 vi.mock("@/features/questionnaire/server/questionnaire", () => ({
   getQuestionnaireForCase: getQuestionnaireForCaseMock,
+  updateQuestionnaireCaseState: updateQuestionnaireCaseStateMock,
 }));
 
 import {
@@ -38,9 +45,22 @@ function queueSelectResult(rows: unknown[]) {
     from: vi.fn(() => chain),
     where: vi.fn(() => chain),
     limit: vi.fn().mockResolvedValue(rows),
+    then: (resolve: (value: unknown[]) => unknown) => Promise.resolve(rows).then(resolve),
   };
 
   dbMock.select.mockReturnValueOnce(chain);
+  return chain;
+}
+
+function createTransactionSelectResult(rows: unknown[]) {
+  const chain = {
+    from: vi.fn(() => chain),
+    where: vi.fn(() => chain),
+    for: vi.fn().mockResolvedValue(rows),
+    then: (resolve: (value: unknown[]) => unknown) =>
+      Promise.resolve(rows).then(resolve),
+  };
+
   return chain;
 }
 
@@ -95,6 +115,7 @@ describe("case form persistence", () => {
     vi.clearAllMocks();
     getQuestionnaireForCaseMock.mockResolvedValue({
       progress: { percent: 50 },
+      state: null,
     });
     updateCaseProgressMock.mockResolvedValue({ progressPercent: 42 });
   });
@@ -175,10 +196,19 @@ describe("case form persistence", () => {
 
   it("removes existing children when the user has no K-2 children", async () => {
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
-    dbMock.delete.mockReturnValueOnce({
-      where: deleteWhere,
-    });
-    const update = queueUpdate();
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn(() => ({ where: updateWhere }));
+    const select = vi
+      .fn()
+      .mockReturnValueOnce(createTransactionSelectResult([{ id: "case-1" }]))
+      .mockReturnValueOnce(createTransactionSelectResult([{ id: "child-1" }]));
+    dbMock.transaction.mockImplementationOnce(async (callback) =>
+      callback({
+        select,
+        delete: vi.fn(() => ({ where: deleteWhere })),
+        update: vi.fn(() => ({ set: updateSet })),
+      }),
+    );
     const formData = formDataFrom([["hasChildren", "no"]]);
 
     await expect(saveChildren("case-1", formData)).resolves.toEqual({
@@ -186,7 +216,7 @@ describe("case form persistence", () => {
       progressPercent: 42,
     });
     expect(deleteWhere).toHaveBeenCalled();
-    expect(update.set).toHaveBeenCalledWith(expect.objectContaining({
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({
       childrenReviewed: true,
       updatedAt: expect.any(Date),
     }));
@@ -198,9 +228,9 @@ describe("case form persistence", () => {
       ["childCount", "0"],
     ]);
 
-    await expect(saveChildren("case-1", formData)).resolves.toEqual({
+    await expect(saveChildren("case-1", formData)).resolves.toMatchObject({
       success: false,
-      error: "Select how many K-2 children to add.",
+      fieldErrors: { childCount: ["Select between one and ten children."] },
     });
     expect(dbMock.transaction).not.toHaveBeenCalled();
   });
@@ -217,23 +247,28 @@ describe("case form persistence", () => {
       ["children.0.relationshipType", "child"],
     ]);
 
-    await expect(saveChildren("case-1", formData)).resolves.toEqual({
+    await expect(saveChildren("case-1", formData)).resolves.toMatchObject({
       success: false,
       error: "Please complete each K-2 child record.",
     });
     expect(dbMock.transaction).not.toHaveBeenCalled();
   });
 
-  it("replaces valid child records in a transaction", async () => {
+  it("reconciles valid child records in a transaction", async () => {
     const txInsertValues = vi.fn().mockResolvedValue(undefined);
-    const txDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn(() => ({ where: updateWhere }));
+    const select = vi
+      .fn()
+      .mockReturnValueOnce(createTransactionSelectResult([{ id: "case-1" }]))
+      .mockReturnValueOnce(createTransactionSelectResult([]));
     dbMock.transaction.mockImplementationOnce(async (callback) =>
       callback({
-        delete: vi.fn(() => ({ where: txDeleteWhere })),
+        select,
         insert: vi.fn(() => ({ values: txInsertValues })),
+        update: vi.fn(() => ({ set: updateSet })),
       }),
     );
-    const update = queueUpdate();
     const formData = formDataFrom([
       ["hasChildren", "yes"],
       ["childCount", "1"],
@@ -241,25 +276,82 @@ describe("case form persistence", () => {
       ["children.0.middleName", ""],
       ["children.0.lastName", "Nguyen"],
       ["children.0.dateOfBirth", "2018-01-01"],
+      ["children.0.countryOfBirth", "Vietnam"],
       ["children.0.citizenship", "Vietnam"],
-      ["children.0.relationshipType", "child"],
+      ["children.0.relationshipType", "Child"],
+      ["children.0.residesWithBeneficiary", "yes"],
     ]);
 
     await expect(saveChildren("case-1", formData)).resolves.toEqual({
       success: true,
       progressPercent: 42,
     });
-    expect(txDeleteWhere).toHaveBeenCalled();
-    expect(txInsertValues).toHaveBeenCalledWith([
+    expect(txInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         caseId: "case-1",
         firstName: "Kai",
         dateOfBirth: expect.any(Date),
         updatedAt: expect.any(Date),
       }),
-    ]);
-    expect(update.set).toHaveBeenCalledWith(expect.objectContaining({
+    );
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({
       childrenReviewed: true,
     }));
+  });
+
+  it("rejects child identifiers outside the locked case", async () => {
+    const select = vi
+      .fn()
+      .mockReturnValueOnce(createTransactionSelectResult([{ id: "case-1" }]))
+      .mockReturnValueOnce(
+        createTransactionSelectResult([
+          { id: "11111111-1111-4111-8111-111111111111" },
+        ]),
+      );
+    const update = vi.fn();
+    dbMock.transaction.mockImplementationOnce(async (callback) =>
+      callback({ select, update }),
+    );
+    const formData = formDataFrom([
+      ["hasChildren", "yes"],
+      ["childCount", "1"],
+      ["children.0.id", "22222222-2222-4222-8222-222222222222"],
+      ["children.0.firstName", "Kai"],
+      ["children.0.middleName", ""],
+      ["children.0.lastName", "Nguyen"],
+      ["children.0.dateOfBirth", "2018-01-01"],
+      ["children.0.countryOfBirth", "Vietnam"],
+      ["children.0.citizenship", "Vietnam"],
+      ["children.0.relationshipType", "Child"],
+      ["children.0.residesWithBeneficiary", "yes"],
+    ]);
+
+    await expect(saveChildren("case-1", formData)).resolves.toMatchObject({
+      success: false,
+      error: "One or more child records do not belong to this case.",
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("sets questionnaire completion when children finish the last section", async () => {
+    getQuestionnaireForCaseMock.mockResolvedValue({
+      progress: { percent: 100 },
+      state: null,
+    });
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn(() => ({ where: updateWhere }));
+    const select = vi
+      .fn()
+      .mockReturnValueOnce(createTransactionSelectResult([{ id: "case-1" }]))
+      .mockReturnValueOnce(createTransactionSelectResult([]));
+    dbMock.transaction.mockImplementationOnce(async (callback) =>
+      callback({ select, update: vi.fn(() => ({ set: updateSet })) }),
+    );
+
+    await saveChildren("case-1", formDataFrom([["hasChildren", "no"]]));
+
+    expect(updateQuestionnaireCaseStateMock).toHaveBeenCalledWith("case-1", {
+      completedAt: expect.any(Date),
+    });
   });
 });

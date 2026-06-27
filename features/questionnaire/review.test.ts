@@ -82,6 +82,8 @@ function createQuestionnaire(): QuestionnaireForCase {
         { sectionKey: "relationship", complete: false },
       ],
     },
+    children: [],
+    childrenReviewed: false,
   };
 }
 
@@ -196,6 +198,98 @@ describe("buildQuestionnaireReview", () => {
         key: "waiver_explanation",
         status: "missing",
       }),
+    ]);
+  });
+
+  it("summarizes canonical child records", () => {
+    const questionnaire = createQuestionnaire();
+    questionnaire.sections.push({
+      id: "section-children",
+      key: "children",
+      title: "Children",
+      description: "K-2 children",
+      sortOrder: 40,
+      questions: [],
+    });
+    questionnaire.childrenReviewed = true;
+    questionnaire.children = [{
+      id: "11111111-1111-4111-8111-111111111111",
+      firstName: "Kai",
+      middleName: null,
+      lastName: "Nguyen",
+      dateOfBirth: new Date("2018-01-01T00:00:00.000Z"),
+      countryOfBirth: "Vietnam",
+      citizenship: "Vietnam",
+      relationshipType: "Child",
+      residesWithBeneficiary: false,
+      street1: "1 Main St",
+      street2: null,
+      city: "Hanoi",
+      province: null,
+      postalCode: "100000",
+      country: "Vietnam",
+      sortOrder: 0,
+    }];
+    questionnaire.progress.sections.push({ sectionKey: "children", complete: true });
+
+    expect(buildQuestionnaireReview(questionnaire).sections[2]).toMatchObject({
+      key: "children",
+      complete: true,
+      questions: [{
+        label: "Child 1: Kai Nguyen",
+        status: "answered",
+        displayValue: expect.stringContaining("Address: 1 Main St, Hanoi"),
+      }],
+    });
+  });
+
+  it("marks only incomplete child records invalid", () => {
+    const questionnaire = createQuestionnaire();
+    questionnaire.sections.push({
+      id: "section-children",
+      key: "children",
+      title: "Children",
+      description: null,
+      sortOrder: 40,
+      questions: [],
+    });
+    const completeChild = {
+      id: "11111111-1111-4111-8111-111111111111",
+      firstName: "Kai",
+      middleName: null,
+      lastName: "Nguyen",
+      dateOfBirth: new Date("2018-01-01T00:00:00.000Z"),
+      countryOfBirth: "Vietnam",
+      citizenship: null,
+      relationshipType: "Child",
+      residesWithBeneficiary: true,
+      street1: null,
+      street2: null,
+      city: null,
+      province: null,
+      postalCode: null,
+      country: null,
+      sortOrder: 0,
+    };
+    questionnaire.childrenReviewed = true;
+    questionnaire.children = [
+      completeChild,
+      {
+        ...completeChild,
+        id: "22222222-2222-4222-8222-222222222222",
+        firstName: "Mina",
+        countryOfBirth: null,
+        sortOrder: 1,
+      },
+    ];
+    questionnaire.progress.sections.push({
+      sectionKey: "children",
+      complete: false,
+    });
+
+    expect(buildQuestionnaireReview(questionnaire).sections[2]?.questions).toEqual([
+      expect.objectContaining({ status: "answered", error: null }),
+      expect.objectContaining({ status: "invalid", error: expect.any(String) }),
     ]);
   });
 });

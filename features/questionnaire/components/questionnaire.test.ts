@@ -90,6 +90,8 @@ const questionnaire = {
     percent: 0,
     sections: [{ sectionKey: "relationship", complete: false }],
   },
+  children: [],
+  childrenReviewed: false,
 } satisfies QuestionnaireForCase;
 
 const successfulSave = {
@@ -569,5 +571,42 @@ describe("QuestionnaireWorkflow", () => {
     );
     expect(html).toContain('id="question-relationship_history-error"');
     expect(html).toContain("Enter a valid response.");
+  });
+
+  it("renders the dedicated children editor in section order", () => {
+    const childrenQuestionnaire: QuestionnaireForCase = {
+      ...questionnaire,
+      sections: [
+        ...questionnaire.sections,
+        {
+          id: "section-children",
+          key: "children",
+          title: "Children",
+          description: "K-2 children",
+          sortOrder: 40,
+          questions: [],
+        },
+      ],
+      progress: {
+        completedSections: 0,
+        totalSections: 2,
+        percent: 0,
+        sections: [
+          ...questionnaire.progress.sections,
+          { sectionKey: "children", complete: false },
+        ],
+      },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionnaireWorkflow, {
+        caseId: "case-1",
+        questionnaire: childrenQuestionnaire,
+        saveSectionAction: async () => successfulSave,
+        childrenSection: React.createElement("div", null, "Dedicated K-2 editor"),
+      }),
+    );
+
+    expect(html).toContain('id="questionnaire-section-children"');
+    expect(html).toContain("Dedicated K-2 editor");
   });
 });

@@ -48,5 +48,6 @@ export async function saveChildrenAction(caseId: string, formData: FormData) {
   await assertCaseOwnership(caseId);
   const result = await saveChildren(caseId, formData);
   revalidatePath("/dashboard");
+  revalidatePath(`/cases/${caseId}`);
   return result;
 }
