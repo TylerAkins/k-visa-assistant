@@ -256,6 +256,67 @@ const beneficiaryQuestions = [
   beneficiaryPassportExpirationQuestion,
 ];
 
+const relationshipQuestions = [
+  {
+    ...activeQuestion,
+    id: "question-familial-relationship",
+    sectionId: "section-relationship",
+    key: "familial_relationship",
+    label: "Are you and your fiance related to each other?",
+    sortOrder: 10,
+  },
+  {
+    ...waiverQuestion,
+    id: "question-familial-relationship-details",
+    sectionId: "section-relationship",
+    key: "familial_relationship_details",
+    label: "Nature and degree of relationship",
+    sortOrder: 20,
+    config: {
+      visibleWhen: { questionKey: "familial_relationship", equals: true },
+    },
+  },
+  {
+    ...activeQuestion,
+    id: "question-met-in-person",
+    sectionId: "section-relationship",
+    sortOrder: 30,
+  },
+  {
+    ...activeQuestion,
+    id: "question-most-recent-meeting-date",
+    sectionId: "section-relationship",
+    key: "most_recent_meeting_date",
+    label: "Most recent in-person meeting date",
+    questionType: "date",
+    sortOrder: 40,
+    config: { visibleWhen: { questionKey: "met_in_person", equals: true } },
+  },
+  {
+    ...waiverQuestion,
+    id: "question-in-person-meeting-details",
+    sectionId: "section-relationship",
+    key: "in_person_meeting_details",
+    label: "In-person meeting details",
+    sortOrder: 50,
+    config: { visibleWhen: { questionKey: "met_in_person", equals: true } },
+  },
+  {
+    ...waiverQuestion,
+    sectionId: "section-relationship",
+    sortOrder: 60,
+  },
+  {
+    ...waiverQuestion,
+    id: "question-relationship-history",
+    sectionId: "section-relationship",
+    key: "relationship_history",
+    label: "Relationship history",
+    sortOrder: 70,
+    config: null,
+  },
+];
+
 describe("questionnaire data access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -477,6 +538,151 @@ describe("questionnaire data access", () => {
         value: "2030-06-15",
       }),
     ]);
+  });
+
+  it("creates and reloads ordered relationship answers for an owned case", async () => {
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const transaction = createTransactionQuery();
+    const formData = new FormData();
+    formData.set("familial_relationship", "false");
+    formData.set("met_in_person", "true");
+    formData.set("most_recent_meeting_date", "2026-01-15");
+    formData.set("in_person_meeting_details", "We met in Chicago.");
+    formData.set("relationship_history", "We met through mutual friends.");
+    const savedAnswers = [
+      ["familial-relationship", false],
+      ["met-in-person", true],
+      ["most-recent-meeting-date", "2026-01-15"],
+      ["in-person-meeting-details", "We met in Chicago."],
+      ["relationship-history", "We met through mutual friends."],
+    ].map(([key, value]) => ({
+      id: `answer-${key}`,
+      caseId: "case-1",
+      questionId: `question-${key}`,
+      value,
+      createdAt: savedAt,
+      updatedAt: savedAt,
+    }));
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(relationshipQuestions))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(relationshipQuestions))
+      .mockReturnValueOnce(createSelectQuery(savedAnswers))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "relationship", formData),
+    ).resolves.toMatchObject({
+      success: true,
+      progressPercent: 78,
+      questionnaireProgress: { completedSections: 1, percent: 25 },
+    });
+
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-most-recent-meeting-date",
+        value: "2026-01-15",
+      }),
+    );
+
+    const questionnaire = await getQuestionnaireForCase("case-1");
+
+    expect(questionnaire.sections[2]).toMatchObject({
+      key: "relationship",
+      questions: relationshipQuestions.map(({ key, sortOrder }) => ({
+        key,
+        sortOrder,
+      })),
+    });
+    expect(questionnaire.answers).toHaveLength(5);
+    expect(questionnaire.answers).toContainEqual(
+      expect.objectContaining({
+        questionKey: "relationship_history",
+        value: "We met through mutual friends.",
+      }),
+    );
+  });
+
+  it("rejects missing relationship answers and invalid meeting dates before writing", async () => {
+    const formData = new FormData();
+    formData.set("familial_relationship", "true");
+    formData.set("met_in_person", "true");
+    formData.set("most_recent_meeting_date", "2026-02-30");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(relationshipQuestions))
+      .mockReturnValueOnce(createSelectQuery([]))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "relationship", formData),
+    ).resolves.toEqual({
+      success: false,
+      fieldErrors: {
+        familial_relationship_details: [
+          'Please answer "Nature and degree of relationship" before saving.',
+        ],
+        most_recent_meeting_date: [
+          'Enter a valid date for "Most recent in-person meeting date".',
+        ],
+        in_person_meeting_details: [
+          'Please answer "In-person meeting details" before saving.',
+        ],
+        relationship_history: [
+          'Please answer "Relationship history" before saving.',
+        ],
+      },
+    });
+    expect(mockDb.transaction).not.toHaveBeenCalled();
+  });
+
+  it("clears saved in-person answers when the waiver branch is selected", async () => {
+    const savedAt = new Date("2026-02-01T00:00:00.000Z");
+    const currentAnswers = [
+      ["most-recent-meeting-date", "2026-01-15"],
+      ["in-person-meeting-details", "We met in Chicago."],
+    ].map(([key, value]) => ({
+      id: `answer-${key}`,
+      caseId: "case-1",
+      questionId: `question-${key}`,
+      value,
+      createdAt: savedAt,
+      updatedAt: savedAt,
+    }));
+    const transaction = createTransactionQuery({ currentAnswers });
+    const formData = new FormData();
+    formData.set("familial_relationship", "false");
+    formData.set("met_in_person", "false");
+    formData.set("meeting_waiver_explanation", "Meeting would cause hardship.");
+    formData.set("relationship_history", "We met through mutual friends.");
+
+    mockDb.select
+      .mockReturnValueOnce(createSelectQuery(completeSections))
+      .mockReturnValueOnce(createSelectQuery(relationshipQuestions))
+      .mockReturnValueOnce(createSelectQuery(currentAnswers))
+      .mockReturnValueOnce(createSelectQuery([]));
+
+    await expect(
+      saveQuestionnaireSectionAnswers("case-1", "relationship", formData),
+    ).resolves.toMatchObject({ success: true });
+
+    expect(transaction.deleteWhere).toHaveBeenCalledTimes(3);
+    expect(transaction.values).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-most-recent-meeting-date",
+      }),
+    );
+    expect(transaction.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        questionId: "question-waiver",
+        value: "Meeting would cause hardship.",
+      }),
+    );
   });
 
   it("uses locked authoritative answers to set full questionnaire progress", async () => {
