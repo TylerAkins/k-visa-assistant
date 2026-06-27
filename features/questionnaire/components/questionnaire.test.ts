@@ -120,6 +120,9 @@ describe("QuestionnaireWorkflow", () => {
     expect(html).toContain('name="citizenship_basis"');
     expect(html).toContain("Naturalization");
     expect(html).not.toContain('name="meeting_waiver_explanation"');
+    expect(html).toContain('id="questionnaire-section-relationship"');
+    expect(html).toContain('href="/cases/case-1/review"');
+    expect(html).toContain("Review answers");
   });
 
   it("renders conditional questions when dependency answers match", () => {
