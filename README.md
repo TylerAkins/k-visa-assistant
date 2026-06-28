@@ -64,6 +64,7 @@ Day-to-day development runs on **local** only. Use `pnpm setup` (default) with D
 - [Environments](docs/environments.md): local setup today; dev/prod templates for later phases.
 - [Questionnaire](docs/questionnaire.md): Phase 3 section registry, case attachment, and review state architecture.
 - [I-129F questionnaire coverage](docs/i-129f-questionnaire-coverage.md): current coverage gaps, required branches, and evidence checklist.
+- [PDF template storage](docs/pdf-template-storage.md): official template location, server-side loading rules, and generated-output separation.
 - [Testing](docs/testing.md): unit test and coverage policy.
 
 ## Project status

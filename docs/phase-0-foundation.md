@@ -54,6 +54,7 @@ Pure black backgrounds are avoided.
 - Social Security Numbers are never stored in Postgres, logs, analytics, or uploaded files.
 - SSN may exist only in memory during on-demand PDF generation (Phase 4).
 - Final filled I-129F PDFs containing SSNs are not persisted.
+- Official PDF templates live under `pdf/templates/`, and any generated PDFs use a separate output path such as `pdf/generated/`.
 
 ## HTTP security headers
 
