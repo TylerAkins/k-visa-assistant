@@ -93,3 +93,12 @@ describe("PDF template storage", () => {
     );
   });
 });
+
+describe("official I-129F template", () => {
+  it("loads the checked-in 01/20/25 XFA form", async () => {
+    const template = await loadI129fTemplate();
+
+    expect(template.subarray(0, 5).toString()).toBe("%PDF-");
+    expect(template.length).toBeGreaterThan(700_000);
+  });
+});
